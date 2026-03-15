@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ChefHat, Sparkles, Users, BookOpen, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import heroFood from "@/assets/hero-food.jpg";
+import logoMci from "@/assets/logo-mci.png";
 
 const features = [
   {
