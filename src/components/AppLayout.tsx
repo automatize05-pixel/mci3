@@ -37,7 +37,6 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           <Link to="/feed" className="flex items-center gap-2">
             <img src={logoMci} alt="MCI Logo" className="h-7" />
           </Link>
-          </Link>
           <nav className="hidden md:flex items-center gap-1">
             {navItems.map((item) => (
               <Link

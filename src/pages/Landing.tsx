@@ -37,7 +37,6 @@ const Landing = () => {
           <Link to="/" className="flex items-center gap-2">
             <img src={logoMci} alt="MCI Logo" className="h-8" />
           </Link>
-          </Link>
           <div className="flex items-center gap-3">
             <Link to="/login">
               <Button variant="ghost" size="sm">Entrar</Button>
