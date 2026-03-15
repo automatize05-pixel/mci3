@@ -74,7 +74,6 @@ const Login = () => {
           <Link to="/" className="inline-flex items-center gap-2 mb-6">
             <img src={logoMci} alt="MCI Logo" className="h-10" />
           </Link>
-          </Link>
           <h1 className="text-2xl font-bold font-display text-foreground">Bem-vindo de volta</h1>
           <p className="text-muted-foreground mt-1">Entre na sua conta para continuar</p>
         </div>

@@ -60,7 +60,6 @@ const Register = () => {
           <Link to="/" className="inline-flex items-center gap-2 mb-6">
             <img src={logoMci} alt="MCI Logo" className="h-10" />
           </Link>
-          </Link>
           <h1 className="text-2xl font-bold font-display text-foreground">Criar conta</h1>
           <p className="text-muted-foreground mt-1">Junte-se à comunidade culinária angolana</p>
         </div>
