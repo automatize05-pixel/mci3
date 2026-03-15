@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { ChefHat, Home, PlusCircle, BookOpen, Sparkles, MessageSquare, User, LogOut, Menu, X } from "lucide-react";
+import { Home, PlusCircle, BookOpen, Sparkles, MessageSquare, User, LogOut, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "react-router-dom";
+import logoMci from "@/assets/logo-mci.png";
 
 interface AppLayoutProps {
   children: React.ReactNode;
