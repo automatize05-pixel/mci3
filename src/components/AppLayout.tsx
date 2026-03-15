@@ -35,8 +35,8 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       <header className="fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-md border-b border-border h-14">
         <div className="container mx-auto flex items-center justify-between h-full px-4">
           <Link to="/feed" className="flex items-center gap-2">
-            <ChefHat className="h-7 w-7 text-primary" />
-            <span className="font-display text-lg font-bold text-foreground">MCI</span>
+            <img src={logoMci} alt="MCI Logo" className="h-7" />
+          </Link>
           </Link>
           <nav className="hidden md:flex items-center gap-1">
             {navItems.map((item) => (
