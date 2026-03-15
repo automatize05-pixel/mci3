@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChefHat, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
+import logoMci from "@/assets/logo-mci.png";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -57,8 +58,7 @@ const Register = () => {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2 mb-6">
-            <ChefHat className="h-10 w-10 text-primary" />
-            <span className="font-display text-2xl font-bold text-foreground">MCI</span>
+            <img src={logoMci} alt="MCI Logo" className="h-10" />
           </Link>
           <h1 className="text-2xl font-bold font-display text-foreground">Criar conta</h1>
           <p className="text-muted-foreground mt-1">Junte-se à comunidade culinária angolana</p>
