@@ -34,6 +34,7 @@ const App = () => (
           <Route path="/ai-recipes" element={<AuthGuard><AIRecipes /></AuthGuard>} />
           <Route path="/messages" element={<AuthGuard><Messages /></AuthGuard>} />
           <Route path="/profile" element={<AuthGuard><Profile /></AuthGuard>} />
+          <Route path="/admin" element={<AuthGuard><Admin /></AuthGuard>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
