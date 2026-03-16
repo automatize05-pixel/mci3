@@ -1,73 +1,114 @@
-# Welcome to your Lovable project
+# MCI — Minha Cozinha Inteligente
 
-## Project info
+[![last commit](https://img.shields.io/github/last-commit/automatize05-pixel/mci3)](https://github.com/automatize05-pixel/mci3/commits/main)
+[![issues](https://img.shields.io/github/issues/automatize05-pixel/mci3)](https://github.com/automatize05-pixel/mci3/issues)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Descrição do Projeto
 
-## How can I edit this code?
+O **MCI — Minha Cozinha Inteligente** é uma plataforma digital que combina rede social culinária e inteligência artificial para ajudar pessoas a descobrir, compartilhar e preparar receitas de forma simples e inteligente.
 
-There are several ways of editing your application.
+Nosso objetivo é conectar amantes da culinária, cozinheiros e chefs em uma comunidade interativa onde é possível publicar pratos, compartilhar receitas, seguir chefs, trocar mensagens e aprender novas formas de cozinhar todos os dias.
 
-**Use Lovable**
+Um dos principais diferenciais do MCI é o **Assistente de Cozinha com Inteligência Artificial**, que permite aos usuários inserir ingredientes disponíveis em casa e receber sugestões de pratos que podem ser preparados com esses ingredientes. Após escolher um prato sugerido, a IA gera uma receita completa com ingredientes, modo de preparo, tempo de cozimento e dicas culinárias.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+O objetivo do MCI é se tornar a principal comunidade culinária digital de Angola, utilizando tecnologia e inteligência artificial para tornar a experiência de cozinhar mais acessível, interativa e inspiradora.
 
-Changes made via Lovable will be committed automatically to this repo.
+## Funcionalidades principais
 
-**Use your preferred IDE**
+- Assistente de receitas com Inteligência Artificial
+- Sugestão de pratos a partir de ingredientes disponíveis
+- Geração automática de receitas passo a passo
+- Feed social de pratos e receitas
+- Sistema de seguidores entre usuários e chefs
+- Comentários com respostas encadeadas
+- Sistema de mensagens privadas
+- Ranking de chefs e receitas populares
+- Desafios culinários semanais
+- Compartilhamento de receitas em redes sociais
+- Sistema de planos para chefs, com recursos premium
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
+## Tecnologias utilizadas
 
 - Vite
 - TypeScript
 - React
 - shadcn-ui
 - Tailwind CSS
+- Supabase (backend e autenticação)
+- Playwright & Vitest (testes)
 
-## How can I deploy this project?
+## Estrutura do Projeto
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+```
+src/
+  assets/
+  components/     # Componentes reutilizáveis React
+  hooks/          # Hooks customizados
+  integrations/   # Integração com APIs externas e IA
+  lib/            # Utilitários/bibliotecas internas
+  pages/          # Páginas principais do app
+  test/           # Testes automatizados
+.env
+public/
+supabase/
+```
 
-## Can I connect a custom domain to my Lovable project?
+## Como rodar o projeto
 
-Yes, you can!
+Pré-requisitos: Node.js e npm instalados.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+```sh
+# Clone o repositório
+git clone https://github.com/automatize05-pixel/mci3.git
+cd mci3
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+# Instale as dependências
+npm install
+
+# Crie ou ajuste o arquivo .env conforme necessário
+
+# Rode o servidor de desenvolvimento
+npm run dev
+
+# Acesse: http://localhost:5173/
+```
+
+## Roadmap
+
+Veja abaixo as etapas de desenvolvimento previstas:
+
+- [ ] Cadastro e login de usuários
+- [ ] Publicação de receitas com fotos e descrição
+- [ ] Sistema de comentários e respostas
+- [ ] Feed social com receitas recentes/populares
+- [ ] Seguir e ser seguido por outros usuários e chefs
+- [ ] Salvar receitas favoritas
+- [ ] Busca e filtros de receitas
+- [ ] Assistente de receitas com IA (ingredientes → sugestões)
+- [ ] Mensagens privadas entre usuários
+- [ ] Rankings e desafios culinários semanais
+- [ ] Painel de assinatura para chefs
+
+Sinta-se livre para sugerir novas features ou discutir prioridades em nossas issues!
+
+## Como contribuir
+
+Quer contribuir? Com certeza, toda ajuda é bem-vinda!
+
+1. Faça um fork deste repositório;
+2. Crie uma branch nova (`git checkout -b minha-feature`);
+3. Faça suas alterações e commits;
+4. Dê push para seu fork (`git push origin minha-feature`);
+5. Abra um Pull Request explicando seu objetivo.
+
+Consulte nosso [guia de contribuição](./.github/CONTRIBUTING.md) para mais detalhes.
+
+## Contato
+
+Dúvidas ou sugestões?  
+Abra uma [issue](https://github.com/automatize05-pixel/mci3/issues) ou envie um e-mail para: contato@minhacozinhainteligente.com
+
+---
+
+Desenvolvido por [automatize05-pixel](https://github.com/automatize05-pixel) e colaboradores.
