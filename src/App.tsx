@@ -19,6 +19,7 @@ import UserProfile from "./pages/UserProfile";
 import Search from "./pages/Search";
 import DiscoverChefs from "./pages/DiscoverChefs";
 import Admin from "./pages/Admin";
+import Analytics from "./pages/Analytics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
