@@ -4,7 +4,7 @@ import AppLayout from "@/components/AppLayout";
 import UserAvatar from "@/components/Avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, PlusCircle, Loader2, Bell, Send, MoreHorizontal, Pencil, Trash2, Reply, Share2 } from "lucide-react";
+import { Heart, MessageCircle, PlusCircle, Loader2, Send, MoreHorizontal, Pencil, Trash2, Reply, Share2, Trophy, Sparkles, TrendingUp, Bookmark } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -40,7 +40,7 @@ const Feed = () => {
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [editingComment, setEditingComment] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
-  const [unreadNotifs, setUnreadNotifs] = useState(0);
+  const [trendingChefs, setTrendingChefs] = useState<any[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -58,7 +58,6 @@ const Feed = () => {
       .limit(50);
     setPosts((data || []) as any);
 
-    // Fetch like counts for all posts
     if (data && data.length > 0) {
       const postIds = data.map((p: any) => p.id);
       const { data: likes } = await supabase.from("likes").select("post_id").in("post_id", postIds);
@@ -67,7 +66,6 @@ const Feed = () => {
       likes?.forEach((l: any) => { counts[l.post_id] = (counts[l.post_id] || 0) + 1; });
       setLikeCounts(counts);
     }
-
     setLoading(false);
   };
 
@@ -77,23 +75,32 @@ const Feed = () => {
     setLikedPosts(new Set(data?.map((l: any) => l.post_id) || []));
   }, [currentUserId]);
 
-  const fetchNotifications = async () => {
-    if (!currentUserId) return;
-    const { count } = await supabase
-      .from("notifications")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", currentUserId)
-      .eq("read_status", false);
-    setUnreadNotifs(count || 0);
+  const fetchTrendingChefs = async () => {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, name, username, profile_picture")
+      .eq("account_type", "chef")
+      .eq("account_status", "approved")
+      .limit(5);
+    if (profiles && profiles.length > 0) {
+      const ids = profiles.map(p => p.id);
+      const { data: followers } = await supabase.from("followers").select("following_id").in("following_id", ids);
+      const counts: Record<string, number> = {};
+      ids.forEach(id => counts[id] = 0);
+      followers?.forEach((f: any) => { counts[f.following_id] = (counts[f.following_id] || 0) + 1; });
+      setTrendingChefs(
+        profiles.map(p => ({ ...p, followers_count: counts[p.id] || 0 }))
+          .sort((a, b) => b.followers_count - a.followers_count)
+      );
+    }
   };
 
-  useEffect(() => { fetchPosts(); }, []);
-  useEffect(() => { if (currentUserId) { fetchMyLikes(); fetchNotifications(); } }, [currentUserId, fetchMyLikes]);
+  useEffect(() => { fetchPosts(); fetchTrendingChefs(); }, []);
+  useEffect(() => { if (currentUserId) fetchMyLikes(); }, [currentUserId, fetchMyLikes]);
 
   const toggleLike = async (postId: string) => {
     if (!currentUserId) return;
     const isLiked = likedPosts.has(postId);
-
     if (isLiked) {
       await supabase.from("likes").delete().eq("user_id", currentUserId).eq("post_id", postId);
       setLikedPosts(prev => { const n = new Set(prev); n.delete(postId); return n; });
@@ -121,16 +128,13 @@ const Feed = () => {
   const submitComment = async (postId: string) => {
     const text = commentText[postId]?.trim();
     if (!text || !currentUserId) return;
-
     const parentId = replyTo[postId]?.id || null;
     const { data, error } = await supabase
       .from("comments")
       .insert({ post_id: postId, user_id: currentUserId, content: text, parent_id: parentId })
       .select("*, profiles(name, username, profile_picture)")
       .single();
-
     if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
-
     setCommentsData(prev => ({ ...prev, [postId]: [...(prev[postId] || []), data as any] }));
     setCommentText(prev => ({ ...prev, [postId]: "" }));
     setReplyTo(prev => ({ ...prev, [postId]: null }));
@@ -157,12 +161,6 @@ const Feed = () => {
     setEditText("");
   };
 
-  const markNotifsRead = async () => {
-    if (!currentUserId || unreadNotifs === 0) return;
-    await supabase.from("notifications").update({ read_status: true }).eq("user_id", currentUserId).eq("read_status", false);
-    setUnreadNotifs(0);
-  };
-
   const timeAgo = (d: string) => {
     const diff = (Date.now() - new Date(d).getTime()) / 1000;
     if (diff < 60) return "agora";
@@ -185,7 +183,6 @@ const Feed = () => {
   const renderComments = (postId: string, parentId: string | null = null, depth = 0) => {
     const comments = (commentsData[postId] || []).filter(c => c.parent_id === parentId);
     const post = posts.find(p => p.id === postId);
-
     return comments.map(c => (
       <div key={c.id} className={`${depth > 0 ? "ml-8 border-l-2 border-border pl-3" : ""}`}>
         <div className="flex gap-2 group">
@@ -206,14 +203,12 @@ const Feed = () => {
             ) : (
               <p className="text-sm text-muted-foreground">{c.content}</p>
             )}
-            <div className="flex items-center gap-2 mt-1">
-              <button
-                onClick={() => setReplyTo(prev => ({ ...prev, [postId]: { id: c.id, name: (c.profiles as any)?.name || "..." } }))}
-                className="text-[10px] text-muted-foreground hover:text-primary font-medium"
-              >
-                Responder
-              </button>
-            </div>
+            <button
+              onClick={() => setReplyTo(prev => ({ ...prev, [postId]: { id: c.id, name: (c.profiles as any)?.name || "..." } }))}
+              className="text-[10px] text-muted-foreground hover:text-primary font-medium mt-1"
+            >
+              Responder
+            </button>
           </div>
           {(c.user_id === currentUserId || post?.user_id === currentUserId) && (
             <DropdownMenu>
@@ -235,7 +230,6 @@ const Feed = () => {
             </DropdownMenu>
           )}
         </div>
-        {/* Nested replies */}
         {renderComments(postId, c.id, depth + 1)}
       </div>
     ));
@@ -243,129 +237,173 @@ const Feed = () => {
 
   return (
     <AppLayout>
-      <div className="container mx-auto px-4 py-6 max-w-xl">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-xl font-bold font-display text-foreground">Início</h1>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="relative rounded-xl" onClick={markNotifsRead}>
-              <Bell className="h-5 w-5" />
-              {unreadNotifs > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold">
-                  {unreadNotifs > 9 ? "9+" : unreadNotifs}
-                </span>
-              )}
-            </Button>
-            <Link to="/create-post">
-              <Button variant="hero" size="sm" className="rounded-xl">
-                <PlusCircle className="h-4 w-4 mr-1" /> Publicar
-              </Button>
-            </Link>
-          </div>
-        </div>
+      <div className="container mx-auto px-4 py-6">
+        <div className="flex gap-6">
+          {/* Center feed */}
+          <div className="flex-1 max-w-2xl mx-auto lg:mx-0">
+            <div className="flex items-center justify-between mb-6">
+              <h1 className="text-xl font-bold font-display text-foreground">Início</h1>
+              <Link to="/create-post">
+                <Button variant="hero" size="sm" className="rounded-xl">
+                  <PlusCircle className="h-4 w-4 mr-1" /> Publicar
+                </Button>
+              </Link>
+            </div>
 
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : posts.length === 0 ? (
-          <div className="bg-card rounded-2xl border border-border p-12 text-center shadow-card">
-            <p className="text-muted-foreground mb-4">Nenhuma publicação ainda. Seja o primeiro!</p>
-            <Link to="/create-post">
-              <Button variant="hero" className="rounded-xl"><PlusCircle className="h-4 w-4 mr-1" /> Criar Publicação</Button>
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {posts.map(post => (
-              <article key={post.id} className="bg-card rounded-2xl border border-border shadow-card overflow-hidden">
-                {/* Author */}
-                <div className="flex items-center gap-3 p-4 pb-2">
-                  <UserAvatar
-                    userId={post.user_id}
-                    src={(post.profiles as any)?.profile_picture}
-                    name={(post.profiles as any)?.name}
-                    username={(post.profiles as any)?.username}
-                    isChef={(post.profiles as any)?.account_type === "chef"}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <Link to={`/user/${post.user_id}`} className="font-semibold text-foreground text-sm hover:underline">
-                      {(post.profiles as any)?.name || (post.profiles as any)?.username || "Anónimo"}
-                    </Link>
-                    <p className="text-xs text-muted-foreground">
-                      @{(post.profiles as any)?.username || "—"} · {timeAgo(post.created_at)}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="px-4 pb-3">
-                  <h2 className="font-display font-semibold text-foreground">{post.title}</h2>
-                  {post.description && <p className="text-sm text-muted-foreground mt-1">{post.description}</p>}
-                </div>
-
-                {post.image_url && (
-                  <img src={post.image_url} alt={post.title} className="w-full max-h-[28rem] object-cover" />
-                )}
-
-                {/* Actions */}
-                <div className="flex items-center gap-1 px-2 py-2 border-t border-border">
-                  <button
-                    onClick={() => toggleLike(post.id)}
-                    className={`flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl transition-all duration-200 ${
-                      likedPosts.has(post.id)
-                        ? "text-primary font-semibold"
-                        : "text-muted-foreground hover:text-primary"
-                    }`}
-                  >
-                    <Heart className={`h-5 w-5 transition-all ${likedPosts.has(post.id) ? "fill-primary" : ""}`} />
-                    <span>{likeCounts[post.id] || 0}</span>
-                  </button>
-                  <button
-                    onClick={() => toggleComments(post.id)}
-                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary px-3 py-2 rounded-xl transition-colors"
-                  >
-                    <MessageCircle className="h-5 w-5" />
-                    <span>{(commentsData[post.id] || []).length || ""}</span>
-                  </button>
-                  <button
-                    onClick={() => sharePost(post)}
-                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary px-3 py-2 rounded-xl transition-colors ml-auto"
-                  >
-                    <Share2 className="h-5 w-5" />
-                  </button>
-                </div>
-
-                {/* Comments */}
-                {expandedComments[post.id] && (
-                  <div className="px-4 pb-4 border-t border-border pt-3 space-y-3">
-                    {renderComments(post.id)}
-
-                    {replyTo[post.id] && (
-                      <div className="flex items-center gap-1 text-xs text-primary bg-primary/5 rounded-lg px-2 py-1">
-                        <Reply className="h-3 w-3" />
-                        A responder a {replyTo[post.id]?.name}
-                        <button onClick={() => setReplyTo(prev => ({ ...prev, [post.id]: null }))} className="ml-auto text-muted-foreground hover:text-foreground">✕</button>
+            {loading ? (
+              <div className="flex justify-center py-16">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : posts.length === 0 ? (
+              <div className="bg-card rounded-2xl border border-border p-12 text-center shadow-card">
+                <p className="text-muted-foreground mb-4">Nenhuma publicação ainda. Seja o primeiro!</p>
+                <Link to="/create-post">
+                  <Button variant="hero" className="rounded-xl"><PlusCircle className="h-4 w-4 mr-1" /> Criar Publicação</Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {posts.map(post => (
+                  <article key={post.id} className="bg-card rounded-2xl border border-border shadow-card overflow-hidden">
+                    <div className="flex items-center gap-3 p-4 pb-2">
+                      <UserAvatar
+                        userId={post.user_id}
+                        src={(post.profiles as any)?.profile_picture}
+                        name={(post.profiles as any)?.name}
+                        username={(post.profiles as any)?.username}
+                        isChef={(post.profiles as any)?.account_type === "chef"}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <Link to={`/user/${post.user_id}`} className="font-semibold text-foreground text-sm hover:underline">
+                          {(post.profiles as any)?.name || (post.profiles as any)?.username || "Anónimo"}
+                        </Link>
+                        <p className="text-xs text-muted-foreground">
+                          @{(post.profiles as any)?.username || "—"} · {timeAgo(post.created_at)}
+                        </p>
                       </div>
+                    </div>
+
+                    <div className="px-4 pb-3">
+                      <h2 className="font-display font-semibold text-foreground">{post.title}</h2>
+                      {post.description && <p className="text-sm text-muted-foreground mt-1">{post.description}</p>}
+                    </div>
+
+                    {post.image_url && (
+                      <img src={post.image_url} alt={post.title} className="w-full max-h-[28rem] object-cover" />
                     )}
 
-                    <div className="flex gap-2">
-                      <input
-                        placeholder={replyTo[post.id] ? "Escreva uma resposta..." : "Escreva um comentário..."}
-                        value={commentText[post.id] || ""}
-                        onChange={e => setCommentText(prev => ({ ...prev, [post.id]: e.target.value }))}
-                        onKeyDown={e => e.key === "Enter" && submitComment(post.id)}
-                        className="flex-1 text-sm bg-muted rounded-xl px-3 py-2 border-none outline-none placeholder:text-muted-foreground"
-                      />
-                      <Button size="icon" variant="ghost" onClick={() => submitComment(post.id)} disabled={!commentText[post.id]?.trim()} className="rounded-xl">
-                        <Send className="h-4 w-4" />
-                      </Button>
+                    <div className="flex items-center gap-1 px-2 py-2 border-t border-border">
+                      <button
+                        onClick={() => toggleLike(post.id)}
+                        className={`flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl transition-all duration-200 ${
+                          likedPosts.has(post.id) ? "text-primary font-semibold" : "text-muted-foreground hover:text-primary"
+                        }`}
+                      >
+                        <Heart className={`h-5 w-5 transition-all ${likedPosts.has(post.id) ? "fill-primary" : ""}`} />
+                        <span>{likeCounts[post.id] || 0}</span>
+                      </button>
+                      <button
+                        onClick={() => toggleComments(post.id)}
+                        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary px-3 py-2 rounded-xl transition-colors"
+                      >
+                        <MessageCircle className="h-5 w-5" />
+                        <span>{(commentsData[post.id] || []).length || ""}</span>
+                      </button>
+                      <button
+                        onClick={() => sharePost(post)}
+                        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary px-3 py-2 rounded-xl transition-colors ml-auto"
+                      >
+                        <Share2 className="h-5 w-5" />
+                      </button>
                     </div>
-                  </div>
-                )}
-              </article>
-            ))}
+
+                    {expandedComments[post.id] && (
+                      <div className="px-4 pb-4 border-t border-border pt-3 space-y-3">
+                        {renderComments(post.id)}
+                        {replyTo[post.id] && (
+                          <div className="flex items-center gap-1 text-xs text-primary bg-primary/5 rounded-lg px-2 py-1">
+                            <Reply className="h-3 w-3" />
+                            A responder a {replyTo[post.id]?.name}
+                            <button onClick={() => setReplyTo(prev => ({ ...prev, [post.id]: null }))} className="ml-auto text-muted-foreground hover:text-foreground">✕</button>
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <input
+                            placeholder={replyTo[post.id] ? "Escreva uma resposta..." : "Escreva um comentário..."}
+                            value={commentText[post.id] || ""}
+                            onChange={e => setCommentText(prev => ({ ...prev, [post.id]: e.target.value }))}
+                            onKeyDown={e => e.key === "Enter" && submitComment(post.id)}
+                            className="flex-1 text-sm bg-muted rounded-xl px-3 py-2 border-none outline-none placeholder:text-muted-foreground"
+                          />
+                          <Button size="icon" variant="ghost" onClick={() => submitComment(post.id)} disabled={!commentText[post.id]?.trim()} className="rounded-xl">
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Right sidebar - desktop only */}
+          <aside className="hidden lg:block w-72 shrink-0 space-y-4">
+            {/* Challenge of the Week */}
+            <div className="bg-card rounded-2xl border border-border p-5 shadow-card">
+              <div className="flex items-center gap-2 mb-3">
+                <Trophy className="h-5 w-5 text-primary" />
+                <h3 className="font-display font-semibold text-foreground text-sm">Desafio da Semana</h3>
+              </div>
+              <div className="gradient-warm rounded-xl p-4 text-primary-foreground">
+                <p className="font-display font-bold text-sm mb-1">Melhor Muamba</p>
+                <p className="text-xs opacity-80">Partilhe a sua versão da muamba de galinha e ganhe destaque!</p>
+              </div>
+              <Link to="/create-post">
+                <Button variant="outline" size="sm" className="w-full rounded-xl mt-3 text-xs">
+                  Participar
+                </Button>
+              </Link>
+            </div>
+
+            {/* Trending Chefs */}
+            <div className="bg-card rounded-2xl border border-border p-5 shadow-card">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-display font-semibold text-foreground text-sm flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-primary" /> Chefs em Alta
+                </h3>
+                <Link to="/discover-chefs" className="text-xs text-primary hover:underline">Ver todos</Link>
+              </div>
+              <div className="space-y-3">
+                {trendingChefs.map(chef => (
+                  <Link key={chef.id} to={`/user/${chef.id}`} className="flex items-center gap-3 group">
+                    <UserAvatar src={chef.profile_picture} name={chef.name} username={chef.username} isChef size="sm" linked={false} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground group-hover:underline truncate">{chef.name || chef.username}</p>
+                      <p className="text-[10px] text-muted-foreground">{chef.followers_count} seguidores</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* AI Tip */}
+            <div className="bg-card rounded-2xl border border-border p-5 shadow-card">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="h-5 w-5 text-secondary" />
+                <h3 className="font-display font-semibold text-foreground text-sm">Dica IA</h3>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Adicione um pouco de gengibre fresco à sua muamba para um sabor mais intenso e aromático.
+              </p>
+              <Link to="/ai-recipes">
+                <Button variant="ghost" size="sm" className="w-full rounded-xl mt-2 text-xs text-primary">
+                  Explorar IA Chef →
+                </Button>
+              </Link>
+            </div>
+          </aside>
+        </div>
       </div>
     </AppLayout>
   );
