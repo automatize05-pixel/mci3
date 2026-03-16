@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { Home, PlusCircle, BookOpen, Sparkles, MessageSquare, User, LogOut, Search, ChefHat, Menu, X } from "lucide-react";
+import { Home, PlusCircle, BookOpen, Sparkles, MessageSquare, User, LogOut, Search, ChefHat, Menu, X, Settings, Bell, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logoMci from "@/assets/logo-mci.png";
 
@@ -9,7 +9,22 @@ interface AppLayoutProps {
   children: React.ReactNode;
 }
 
-const navItems = [
+const mainNav = [
+  { href: "/feed", icon: Home, label: "Início" },
+  { href: "/recipes", icon: BookOpen, label: "Receitas" },
+  { href: "/ai-recipes", icon: Sparkles, label: "IA Chef" },
+  { href: "/messages", icon: MessageSquare, label: "Mensagens" },
+  { href: "/discover-chefs", icon: ChefHat, label: "Chefs" },
+];
+
+const secondaryNav = [
+  { href: "/notifications", icon: Bell, label: "Notificações" },
+  { href: "/search", icon: Search, label: "Pesquisar" },
+  { href: "/profile", icon: User, label: "Perfil" },
+  { href: "/settings", icon: Settings, label: "Definições" },
+];
+
+const mobileBottomNav = [
   { href: "/feed", icon: Home, label: "Início" },
   { href: "/recipes", icon: BookOpen, label: "Receitas" },
   { href: "/create-post", icon: PlusCircle, label: "Publicar" },
@@ -27,56 +42,31 @@ const AppLayout = ({ children }: AppLayoutProps) => {
     navigate("/");
   };
 
+  const isActive = (href: string) => location.pathname === href;
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Top nav */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-card/90 backdrop-blur-xl border-b border-border/50 h-14">
-        <div className="container mx-auto flex items-center justify-between h-full px-4">
+      {/* Top nav - mobile only */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-card/90 backdrop-blur-xl border-b border-border/50 h-14 md:hidden">
+        <div className="flex items-center justify-between h-full px-4">
           <Link to="/feed" className="flex items-center gap-2">
             <img src={logoMci} alt="MCI" className="h-7" />
           </Link>
-
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                to={item.href}
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  location.pathname === item.href
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-
           <div className="flex items-center gap-1">
             <Link to="/search">
               <Button variant="ghost" size="icon" className="rounded-xl">
                 <Search className="h-4 w-4" />
               </Button>
             </Link>
-            <Link to="/discover-chefs">
-              <Button variant="ghost" size="icon" className="rounded-xl hidden md:flex">
-                <ChefHat className="h-4 w-4" />
+            <Link to="/notifications">
+              <Button variant="ghost" size="icon" className="rounded-xl">
+                <Bell className="h-4 w-4" />
               </Button>
             </Link>
-            <Link to="/profile">
-              <Button variant="ghost" size="icon" className="rounded-xl hidden md:flex">
-                <User className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Button variant="ghost" size="icon" onClick={handleLogout} className="rounded-xl hidden md:flex">
-              <LogOut className="h-4 w-4" />
-            </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden rounded-xl"
+              className="rounded-xl"
               onClick={() => setMobileMenu(!mobileMenu)}
             >
               {mobileMenu ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -89,32 +79,110 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       {mobileMenu && (
         <div className="fixed inset-0 z-40 pt-14 bg-background/95 backdrop-blur-xl md:hidden animate-in fade-in duration-200">
           <nav className="flex flex-col p-4 gap-1">
-            <Link to="/discover-chefs" onClick={() => setMobileMenu(false)}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium text-muted-foreground hover:text-foreground hover:bg-muted">
-              <ChefHat className="h-5 w-5" /> Descobrir Chefs
+            {[...mainNav, ...secondaryNav].map(item => (
+              <Link
+                key={item.href}
+                to={item.href}
+                onClick={() => setMobileMenu(false)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-colors ${
+                  isActive(item.href)
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                <item.icon className="h-5 w-5" />
+                {item.label}
+              </Link>
+            ))}
+            <Link
+              to="/create-post"
+              onClick={() => setMobileMenu(false)}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium text-muted-foreground hover:text-foreground hover:bg-muted"
+            >
+              <PlusCircle className="h-5 w-5" />
+              Publicar
             </Link>
-            <Link to="/profile" onClick={() => setMobileMenu(false)}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium text-muted-foreground hover:text-foreground hover:bg-muted">
-              <User className="h-5 w-5" /> Perfil
-            </Link>
-            <button onClick={() => { setMobileMenu(false); handleLogout(); }}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium text-destructive hover:bg-destructive/10 text-left">
+            <button
+              onClick={() => { setMobileMenu(false); handleLogout(); }}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium text-destructive hover:bg-destructive/10 text-left"
+            >
               <LogOut className="h-5 w-5" /> Sair
             </button>
           </nav>
         </div>
       )}
 
+      {/* Desktop left sidebar */}
+      <aside className="hidden md:flex fixed left-0 top-0 bottom-0 z-40 w-60 bg-card border-r border-border/50 flex-col">
+        <div className="p-5">
+          <Link to="/feed" className="flex items-center gap-2">
+            <img src={logoMci} alt="MCI" className="h-8" />
+          </Link>
+        </div>
+
+        <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
+          {mainNav.map(item => (
+            <Link
+              key={item.href}
+              to={item.href}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                isActive(item.href)
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <item.icon className="h-[18px] w-[18px]" />
+              {item.label}
+            </Link>
+          ))}
+
+          {/* Create post button */}
+          <Link to="/create-post">
+            <Button variant="hero" size="sm" className="w-full rounded-xl mt-3 gap-2">
+              <PlusCircle className="h-4 w-4" />
+              Publicar
+            </Button>
+          </Link>
+
+          <div className="h-px bg-border my-4" />
+
+          {secondaryNav.map(item => (
+            <Link
+              key={item.href}
+              to={item.href}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                isActive(item.href)
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <item.icon className="h-[18px] w-[18px]" />
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="p-3 border-t border-border/50">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 w-full transition-colors"
+          >
+            <LogOut className="h-[18px] w-[18px]" />
+            Sair
+          </button>
+        </div>
+      </aside>
+
       {/* Content */}
-      <main className="pt-14 pb-safe md:pb-0 min-h-screen">
+      <main className="pt-14 md:pt-0 md:pl-60 pb-safe md:pb-0 min-h-screen">
         {children}
       </main>
 
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/90 backdrop-blur-xl border-t border-border/50 md:hidden safe-area-bottom">
         <div className="flex items-center justify-around h-14">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.href;
+          {mobileBottomNav.map((item) => {
+            const active = isActive(item.href);
             const isCreate = item.href === "/create-post";
             return (
               <Link
@@ -123,7 +191,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
                 className={`flex flex-col items-center gap-0.5 text-[10px] font-medium transition-all ${
                   isCreate
                     ? "relative -mt-3"
-                    : isActive
+                    : active
                     ? "text-primary"
                     : "text-muted-foreground"
                 }`}
@@ -134,7 +202,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
                   </div>
                 ) : (
                   <>
-                    <item.icon className={`h-5 w-5 ${isActive ? "text-primary" : ""}`} />
+                    <item.icon className={`h-5 w-5 ${active ? "text-primary" : ""}`} />
                     <span>{item.label}</span>
                   </>
                 )}
