@@ -2,13 +2,15 @@ import { useState, useRef, useEffect } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Sparkles, Send, Loader2, ChefHat, Trash2, UtensilsCrossed, Salad, CookingPot, ShoppingCart, Lock } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sparkles, Send, Loader2, ChefHat, Trash2, UtensilsCrossed, Salad, CookingPot, ShoppingCart, Lock, Plus, MessageSquare, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
 
 type Msg = { role: "user" | "assistant"; content: string };
+type Conversation = { id: string; title: string; messages: Msg[]; created_at: string; updated_at: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chef`;
 
@@ -81,6 +83,10 @@ const AIRecipes = () => {
   const [plan, setPlan] = useState("free");
   const [aiUsage, setAiUsage] = useState(0);
   const [loadingPlan, setLoadingPlan] = useState(true);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConvId, setActiveConvId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
@@ -94,32 +100,59 @@ const AIRecipes = () => {
   }, [messages]);
 
   useEffect(() => {
-    const loadPlan = async () => {
+    const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setLoadingPlan(false); return; }
+      setUserId(user.id);
       const currentMonth = new Date().toISOString().slice(0, 7);
-      const [{ data: subData }, { data: usageData }] = await Promise.all([
+      const [{ data: subData }, { data: usageData }, { data: convData }] = await Promise.all([
         supabase.from("subscriptions").select("plan").eq("user_id", user.id).single(),
         supabase.from("ai_usage_log").select("usage_count").eq("user_id", user.id).eq("month_year", currentMonth).single(),
+        supabase.from("ai_conversations").select("*").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(50),
       ]);
       setPlan((subData as any)?.plan || "free");
       setAiUsage(usageData?.usage_count || 0);
+      setConversations((convData as any[]) || []);
       setLoadingPlan(false);
     };
-    loadPlan();
+    init();
   }, []);
 
+  const saveConversation = async (msgs: Msg[], convId: string | null) => {
+    if (!userId || msgs.length === 0) return convId;
+    const title = msgs[0]?.content?.slice(0, 60) || "Nova conversa";
+    
+    if (convId) {
+      await supabase.from("ai_conversations")
+        .update({ messages: msgs as any, title, updated_at: new Date().toISOString() })
+        .eq("id", convId);
+      setConversations(prev => prev.map(c => c.id === convId ? { ...c, messages: msgs, title, updated_at: new Date().toISOString() } : c));
+      return convId;
+    } else {
+      const { data } = await supabase.from("ai_conversations")
+        .insert({ user_id: userId, title, messages: msgs as any })
+        .select("id, title, messages, created_at, updated_at")
+        .single();
+      if (data) {
+        const newConv = data as any as Conversation;
+        setConversations(prev => [newConv, ...prev]);
+        setActiveConvId(newConv.id);
+        return newConv.id;
+      }
+      return null;
+    }
+  };
+
   const incrementUsage = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!userId) return;
     const currentMonth = new Date().toISOString().slice(0, 7);
     const { data: existing } = await supabase.from("ai_usage_log")
-      .select("id, usage_count").eq("user_id", user.id).eq("month_year", currentMonth).single();
+      .select("id, usage_count").eq("user_id", userId).eq("month_year", currentMonth).single();
     if (existing) {
       await supabase.from("ai_usage_log").update({ usage_count: existing.usage_count + 1 }).eq("id", existing.id);
       setAiUsage(existing.usage_count + 1);
     } else {
-      await supabase.from("ai_usage_log").insert({ user_id: user.id, month_year: currentMonth, usage_count: 1 });
+      await supabase.from("ai_usage_log").insert({ user_id: userId, month_year: currentMonth, usage_count: 1 });
       setAiUsage(1);
     }
   };
@@ -127,7 +160,7 @@ const AIRecipes = () => {
   const send = async (text: string) => {
     if (!text.trim() || isLoading) return;
     if (isLimitReached) {
-      toast({ title: "Limite atingido", description: `Atingiu o limite de ${aiLimit} pedidos este mês. Faça upgrade do plano!`, variant: "destructive" });
+      toast({ title: "Limite atingido", description: `Atingiu o limite de ${aiLimit} pedidos este mês.`, variant: "destructive" });
       return;
     }
     const userMsg: Msg = { role: "user", content: text.trim() };
@@ -137,6 +170,8 @@ const AIRecipes = () => {
     setIsLoading(true);
 
     let assistantSoFar = "";
+    let currentConvId = activeConvId;
+
     const upsertAssistant = (chunk: string) => {
       assistantSoFar += chunk;
       setMessages(prev => {
@@ -153,6 +188,10 @@ const AIRecipes = () => {
       onDelta: upsertAssistant,
       onDone: async () => {
         setIsLoading(false);
+        const finalMsgs = [...newMessages, { role: "assistant" as const, content: assistantSoFar }];
+        setMessages(finalMsgs);
+        currentConvId = await saveConversation(finalMsgs, currentConvId);
+        if (currentConvId) setActiveConvId(currentConvId);
         await incrementUsage();
       },
       onError: (msg) => {
@@ -162,8 +201,36 @@ const AIRecipes = () => {
     });
   };
 
+  const loadConversation = (conv: Conversation) => {
+    setMessages(conv.messages);
+    setActiveConvId(conv.id);
+    setShowHistory(false);
+  };
+
+  const newConversation = () => {
+    setMessages([]);
+    setActiveConvId(null);
+    setShowHistory(false);
+  };
+
+  const deleteConversation = async (convId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await supabase.from("ai_conversations").delete().eq("id", convId);
+    setConversations(prev => prev.filter(c => c.id !== convId));
+    if (activeConvId === convId) { setMessages([]); setActiveConvId(null); }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); }
+  };
+
+  const timeAgo = (d: string) => {
+    const diff = Date.now() - new Date(d).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h`;
+    return `${Math.floor(hours / 24)}d`;
   };
 
   return (
@@ -191,11 +258,12 @@ const AIRecipes = () => {
                 )}
               </div>
             )}
-            {messages.length > 0 && (
-              <Button variant="ghost" size="sm" className="rounded-xl text-xs gap-1 text-muted-foreground" onClick={() => setMessages([])}>
-                <Trash2 className="h-3 w-3" /> Limpar
-              </Button>
-            )}
+            <Button variant="ghost" size="sm" className="rounded-xl text-xs gap-1 text-muted-foreground" onClick={() => setShowHistory(!showHistory)}>
+              <Clock className="h-3 w-3" /> Histórico
+            </Button>
+            <Button variant="ghost" size="sm" className="rounded-xl text-xs gap-1 text-muted-foreground" onClick={newConversation}>
+              <Plus className="h-3 w-3" /> Nova
+            </Button>
           </div>
         </div>
 
@@ -212,6 +280,38 @@ const AIRecipes = () => {
             <Link to="/settings">
               <Button variant="hero" size="sm" className="rounded-xl text-xs">Upgrade</Button>
             </Link>
+          </div>
+        )}
+
+        {/* History sidebar overlay */}
+        {showHistory && (
+          <div className="shrink-0 mb-4 bg-card rounded-2xl border border-border shadow-card overflow-hidden max-h-64">
+            <div className="p-3 border-b border-border flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-foreground">Conversas anteriores</h3>
+              <span className="text-xs text-muted-foreground">{conversations.length} conversas</span>
+            </div>
+            <ScrollArea className="max-h-48">
+              {conversations.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">Sem conversas guardadas</p>
+              ) : (
+                <div className="p-2 space-y-1">
+                  {conversations.map(conv => (
+                    <button key={conv.id} onClick={() => loadConversation(conv)}
+                      className={`w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-colors group ${activeConvId === conv.id ? "bg-primary/10" : "hover:bg-muted"}`}>
+                      <MessageSquare className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-foreground truncate">{conv.title}</p>
+                        <p className="text-[10px] text-muted-foreground">{timeAgo(conv.updated_at)} · {(conv.messages?.length || 0)} msgs</p>
+                      </div>
+                      <button onClick={(e) => deleteConversation(conv.id, e)}
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-destructive/10 transition-all">
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                      </button>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
           </div>
         )}
 
