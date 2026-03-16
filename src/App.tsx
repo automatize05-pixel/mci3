@@ -13,6 +13,9 @@ import Recipes from "./pages/Recipes";
 import AIRecipes from "./pages/AIRecipes";
 import Messages from "./pages/Messages";
 import Profile from "./pages/Profile";
+import UserProfile from "./pages/UserProfile";
+import Search from "./pages/Search";
+import DiscoverChefs from "./pages/DiscoverChefs";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
@@ -34,6 +37,9 @@ const App = () => (
           <Route path="/ai-recipes" element={<AuthGuard><AIRecipes /></AuthGuard>} />
           <Route path="/messages" element={<AuthGuard><Messages /></AuthGuard>} />
           <Route path="/profile" element={<AuthGuard><Profile /></AuthGuard>} />
+          <Route path="/user/:userId" element={<AuthGuard><UserProfile /></AuthGuard>} />
+          <Route path="/search" element={<AuthGuard><Search /></AuthGuard>} />
+          <Route path="/discover-chefs" element={<AuthGuard><DiscoverChefs /></AuthGuard>} />
           <Route path="/admin" element={<AuthGuard><Admin /></AuthGuard>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
