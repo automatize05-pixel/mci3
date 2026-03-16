@@ -13,6 +13,8 @@ import Recipes from "./pages/Recipes";
 import AIRecipes from "./pages/AIRecipes";
 import Messages from "./pages/Messages";
 import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
+import Notifications from "./pages/Notifications";
 import UserProfile from "./pages/UserProfile";
 import Search from "./pages/Search";
 import DiscoverChefs from "./pages/DiscoverChefs";
@@ -37,6 +39,8 @@ const App = () => (
           <Route path="/ai-recipes" element={<AuthGuard><AIRecipes /></AuthGuard>} />
           <Route path="/messages" element={<AuthGuard><Messages /></AuthGuard>} />
           <Route path="/profile" element={<AuthGuard><Profile /></AuthGuard>} />
+          <Route path="/settings" element={<AuthGuard><Settings /></AuthGuard>} />
+          <Route path="/notifications" element={<AuthGuard><Notifications /></AuthGuard>} />
           <Route path="/user/:userId" element={<AuthGuard><UserProfile /></AuthGuard>} />
           <Route path="/search" element={<AuthGuard><Search /></AuthGuard>} />
           <Route path="/discover-chefs" element={<AuthGuard><DiscoverChefs /></AuthGuard>} />
