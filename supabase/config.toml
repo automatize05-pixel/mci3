@@ -1,1 +1,7 @@
 project_id = "lxobdvxngwkeyinjytna"
+
+[functions.generate-recipe]
+verify_jwt = false
+
+[functions.ai-chef]
+verify_jwt = false
