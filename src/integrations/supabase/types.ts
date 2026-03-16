@@ -19,6 +19,7 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          parent_id: string | null
           post_id: string
           user_id: string
         }
@@ -26,6 +27,7 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
+          parent_id?: string | null
           post_id: string
           user_id: string
         }
@@ -33,10 +35,18 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          parent_id?: string | null
           post_id?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "comments_post_id_fkey"
             columns: ["post_id"]
@@ -83,6 +93,42 @@ export type Database = {
           {
             foreignKeyName: "followers_following_id_fkey"
             columns: ["following_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      likes: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "likes_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -204,6 +250,7 @@ export type Database = {
       profiles: {
         Row: {
           account_status: Database["public"]["Enums"]["account_status"]
+          account_type: Database["public"]["Enums"]["account_type"]
           bio: string | null
           created_at: string
           email: string | null
@@ -214,6 +261,7 @@ export type Database = {
         }
         Insert: {
           account_status?: Database["public"]["Enums"]["account_status"]
+          account_type?: Database["public"]["Enums"]["account_type"]
           bio?: string | null
           created_at?: string
           email?: string | null
@@ -224,6 +272,7 @@ export type Database = {
         }
         Update: {
           account_status?: Database["public"]["Enums"]["account_status"]
+          account_type?: Database["public"]["Enums"]["account_type"]
           bio?: string | null
           created_at?: string
           email?: string | null
@@ -383,6 +432,7 @@ export type Database = {
     }
     Enums: {
       account_status: "pending" | "approved" | "suspended"
+      account_type: "user" | "chef"
       app_role: "admin" | "user"
     }
     CompositeTypes: {
@@ -512,6 +562,7 @@ export const Constants = {
   public: {
     Enums: {
       account_status: ["pending", "approved", "suspended"],
+      account_type: ["user", "chef"],
       app_role: ["admin", "user"],
     },
   },
