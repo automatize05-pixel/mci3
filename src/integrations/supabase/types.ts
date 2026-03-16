@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_usage_log: {
+        Row: {
+          created_at: string
+          id: string
+          month_year: string
+          usage_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          month_year: string
+          usage_count?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          month_year?: string
+          usage_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       comments: {
         Row: {
           content: string
@@ -395,6 +419,33 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          plan: Database["public"]["Enums"]["subscription_plan"]
+          started_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          plan?: Database["public"]["Enums"]["subscription_plan"]
+          started_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          plan?: Database["public"]["Enums"]["subscription_plan"]
+          started_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -422,6 +473,11 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["account_status"]
       }
+      get_ai_usage_this_month: { Args: { _user_id: string }; Returns: number }
+      get_user_plan: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["subscription_plan"]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -429,11 +485,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_ai_usage: { Args: { _user_id: string }; Returns: number }
     }
     Enums: {
       account_status: "pending" | "approved" | "suspended"
       account_type: "user" | "chef"
       app_role: "admin" | "user"
+      subscription_plan: "free" | "starter" | "pro" | "elite"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -564,6 +622,7 @@ export const Constants = {
       account_status: ["pending", "approved", "suspended"],
       account_type: ["user", "chef"],
       app_role: ["admin", "user"],
+      subscription_plan: ["free", "starter", "pro", "elite"],
     },
   },
 } as const

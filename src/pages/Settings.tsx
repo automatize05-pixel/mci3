@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Camera, Loader2, Save, User, Shield, CreditCard, Bell, ChefHat, Check, Lock } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Camera, Loader2, Save, User, Shield, CreditCard, Bell, ChefHat, Check, Lock, Sparkles, BarChart3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 
@@ -21,10 +22,10 @@ const tabs: { id: SettingsTab; label: string; icon: React.ElementType }[] = [
 ];
 
 const plans = [
-  { name: "Gratuito", price: "0", period: "para sempre", features: ["5 receitas IA/mês", "Feed social", "Perfil básico"], current: true },
-  { name: "Chef Starter", price: "2.500", period: "Kz/mês", features: ["50 receitas IA/mês", "Planeamento semanal", "Badge Starter"], current: false },
-  { name: "Chef Pro", price: "5.000", period: "Kz/mês", features: ["IA ilimitada", "Analytics", "Badge Pro", "Monetização"], current: false, popular: true },
-  { name: "Chef Elite", price: "10.000", period: "Kz/mês", features: ["Tudo do Pro", "Consultoria IA", "Destaque", "API access"], current: false },
+  { id: "free" as const, name: "Gratuito", price: "0", period: "para sempre", aiLimit: 5, features: ["5 receitas IA/mês", "Feed social", "Perfil básico"], current: false },
+  { id: "starter" as const, name: "Chef Starter", price: "3.500", period: "Kz/mês", aiLimit: 50, features: ["50 receitas IA/mês", "Planeamento semanal", "Badge Starter"], current: false },
+  { id: "pro" as const, name: "Chef Pro", price: "7.000", period: "Kz/mês", aiLimit: 9999, features: ["IA ilimitada", "Analytics", "Badge Pro", "Monetização"], current: false, popular: true },
+  { id: "elite" as const, name: "Chef Elite", price: "15.000", period: "Kz/mês", aiLimit: 9999, features: ["Tudo do Pro", "Consultoria IA", "Destaque", "API access"], current: false },
 ];
 
 const Settings = () => {
@@ -34,6 +35,9 @@ const Settings = () => {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState("free");
+  const [aiUsage, setAiUsage] = useState(0);
+  const [changingPlan, setChangingPlan] = useState<string | null>(null);
   const [profile, setProfile] = useState({
     name: "", username: "", email: "", bio: "", profile_picture: "", account_type: "user",
   });
@@ -45,18 +49,23 @@ const Settings = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setUserId(user.id);
-      const [{ data: p }, { data: r }] = await Promise.all([
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const [{ data: p }, { data: r }, { data: sub }, { data: usage }] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", user.id).single(),
         supabase.from("user_roles").select("role").eq("user_id", user.id).single(),
+        supabase.from("subscriptions").select("plan").eq("user_id", user.id).single(),
+        supabase.from("ai_usage_log").select("usage_count").eq("user_id", user.id).eq("month_year", currentMonth).single(),
       ]);
       if (p) {
         setProfile({
           name: p.name || "", username: p.username || "", email: p.email || "",
           bio: p.bio || "", profile_picture: p.profile_picture || "",
-          account_type: (p as any).account_type || "user",
+          account_type: p.account_type || "user",
         });
       }
       setIsAdmin(r?.role === "admin");
+      setCurrentPlan((sub as any)?.plan || "free");
+      setAiUsage(usage?.usage_count || 0);
       setLoading(false);
     };
     load();
@@ -100,6 +109,27 @@ const Settings = () => {
     setUploading(false);
   };
 
+  const handleChangePlan = async (planId: string) => {
+    if (planId === currentPlan) return;
+    setChangingPlan(planId);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Check if subscription exists
+    const { data: existing } = await supabase.from("subscriptions").select("id").eq("user_id", user.id).single();
+    if (existing) {
+      await supabase.from("subscriptions").update({ plan: planId as any, started_at: new Date().toISOString() }).eq("user_id", user.id);
+    } else {
+      await supabase.from("subscriptions").insert({ user_id: user.id, plan: planId as any });
+    }
+    setCurrentPlan(planId);
+    setChangingPlan(null);
+    toast({ title: "Plano actualizado!", description: `Agora está no plano ${plans.find(p => p.id === planId)?.name}` });
+  };
+
+  const aiLimit = plans.find(p => p.id === currentPlan)?.aiLimit || 5;
+  const isUnlimited = aiLimit >= 9999;
+
   if (loading) {
     return (
       <AppLayout>
@@ -121,6 +151,11 @@ const Settings = () => {
                 <Button variant="outline" size="sm" className="rounded-xl text-xs">Ver Público</Button>
               </Link>
             )}
+            <Link to="/analytics">
+              <Button variant="outline" size="sm" className="rounded-xl text-xs gap-1">
+                <BarChart3 className="h-3 w-3" /> Analytics
+              </Button>
+            </Link>
             {isAdmin && (
               <Link to="/admin">
                 <Button variant="outline" size="sm" className="rounded-xl text-xs">
@@ -136,17 +171,11 @@ const Settings = () => {
           <div className="md:w-56 shrink-0">
             <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible">
               {tabs.map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
-                    activeTab === tab.id
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }`}
-                >
-                  <tab.icon className="h-4 w-4" />
-                  {tab.label}
+                    activeTab === tab.id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}>
+                  <tab.icon className="h-4 w-4" /> {tab.label}
                 </button>
               ))}
             </nav>
@@ -158,11 +187,8 @@ const Settings = () => {
               <div className="bg-card rounded-2xl border border-border p-6 shadow-card space-y-6">
                 <div className="flex flex-col items-center">
                   <div className="relative">
-                    <UserAvatar
-                      src={profile.profile_picture} name={profile.name}
-                      username={profile.username} isChef={profile.account_type === "chef"}
-                      size="xl" linked={false}
-                    />
+                    <UserAvatar src={profile.profile_picture} name={profile.name} username={profile.username}
+                      isChef={profile.account_type === "chef"} size="xl" linked={false} />
                     <label className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center cursor-pointer hover:bg-primary/90 transition-colors ring-2 ring-background">
                       {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
                       <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" disabled={uploading} />
@@ -175,22 +201,14 @@ const Settings = () => {
                   )}
                 </div>
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nome</Label>
-                    <Input id="name" value={profile.name} onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} maxLength={100} className="rounded-xl" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="username">Username</Label>
-                    <Input id="username" value={profile.username} onChange={e => setProfile(p => ({ ...p, username: e.target.value }))} maxLength={30} className="rounded-xl" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" value={profile.email} disabled className="opacity-60 rounded-xl" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="bio">Bio</Label>
-                    <Textarea id="bio" placeholder="Conte um pouco sobre si..." value={profile.bio} onChange={e => setProfile(p => ({ ...p, bio: e.target.value }))} rows={3} maxLength={300} className="rounded-xl" />
-                  </div>
+                  <div className="space-y-2"><Label htmlFor="name">Nome</Label>
+                    <Input id="name" value={profile.name} onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} maxLength={100} className="rounded-xl" /></div>
+                  <div className="space-y-2"><Label htmlFor="username">Username</Label>
+                    <Input id="username" value={profile.username} onChange={e => setProfile(p => ({ ...p, username: e.target.value }))} maxLength={30} className="rounded-xl" /></div>
+                  <div className="space-y-2"><Label htmlFor="email">Email</Label>
+                    <Input id="email" value={profile.email} disabled className="opacity-60 rounded-xl" /></div>
+                  <div className="space-y-2"><Label htmlFor="bio">Bio</Label>
+                    <Textarea id="bio" placeholder="Conte um pouco sobre si..." value={profile.bio} onChange={e => setProfile(p => ({ ...p, bio: e.target.value }))} rows={3} maxLength={300} className="rounded-xl" /></div>
                 </div>
                 <Button onClick={handleSave} variant="hero" size="lg" className="w-full rounded-xl" disabled={saving}>
                   {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> A guardar...</> : <><Save className="h-4 w-4" /> Guardar Alterações</>}
@@ -202,22 +220,11 @@ const Settings = () => {
               <div className="bg-card rounded-2xl border border-border p-6 shadow-card space-y-6">
                 <h2 className="font-display font-semibold text-foreground text-lg">Segurança</h2>
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Palavra-passe actual</Label>
-                    <Input type="password" placeholder="••••••••" className="rounded-xl" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Nova palavra-passe</Label>
-                    <Input type="password" placeholder="••••••••" className="rounded-xl" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Confirmar nova palavra-passe</Label>
-                    <Input type="password" placeholder="••••••••" className="rounded-xl" />
-                  </div>
+                  <div className="space-y-2"><Label>Palavra-passe actual</Label><Input type="password" placeholder="••••••••" className="rounded-xl" /></div>
+                  <div className="space-y-2"><Label>Nova palavra-passe</Label><Input type="password" placeholder="••••••••" className="rounded-xl" /></div>
+                  <div className="space-y-2"><Label>Confirmar nova palavra-passe</Label><Input type="password" placeholder="••••••••" className="rounded-xl" /></div>
                 </div>
-                <Button variant="hero" className="rounded-xl gap-2">
-                  <Lock className="h-4 w-4" /> Alterar Palavra-passe
-                </Button>
+                <Button variant="hero" className="rounded-xl gap-2"><Lock className="h-4 w-4" /> Alterar Palavra-passe</Button>
                 <div className="border-t border-border pt-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -232,42 +239,54 @@ const Settings = () => {
 
             {activeTab === "assinaturas" && (
               <div className="space-y-4">
-                <h2 className="font-display font-semibold text-foreground text-lg">Plano Actual</h2>
+                {/* AI Usage bar */}
+                <div className="bg-card rounded-2xl border border-border p-5 shadow-card">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <h3 className="font-display font-semibold text-foreground text-sm">Uso do Chef IA este mês</h3>
+                  </div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-muted-foreground">Pedidos utilizados</span>
+                    <span className="font-semibold text-foreground">{aiUsage}/{isUnlimited ? "∞" : aiLimit}</span>
+                  </div>
+                  <Progress value={isUnlimited ? 100 : Math.min((aiUsage / aiLimit) * 100, 100)} className="h-2.5" />
+                </div>
+
+                <h2 className="font-display font-semibold text-foreground text-lg">Escolha o seu plano</h2>
                 <div className="grid sm:grid-cols-2 gap-4">
-                  {plans.map(plan => (
-                    <div
-                      key={plan.name}
-                      className={`bg-card rounded-2xl p-5 border shadow-card ${
-                        plan.current ? "border-primary ring-1 ring-primary/20" : plan.popular ? "border-primary/50" : "border-border"
-                      }`}
-                    >
-                      {plan.current && (
-                        <span className="inline-block px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-2">
-                          Plano Actual
-                        </span>
-                      )}
-                      {plan.popular && !plan.current && (
-                        <span className="inline-block px-2 py-0.5 rounded-full gradient-warm text-primary-foreground text-xs font-semibold mb-2">
-                          Popular
-                        </span>
-                      )}
-                      <h3 className="font-display font-bold text-foreground">{plan.name}</h3>
-                      <div className="mt-1 mb-3">
-                        <span className="text-2xl font-extrabold font-display text-foreground">{plan.price}</span>
-                        <span className="text-xs text-muted-foreground ml-1">{plan.period}</span>
+                  {plans.map(plan => {
+                    const isCurrent = plan.id === currentPlan;
+                    return (
+                      <div key={plan.name}
+                        className={`bg-card rounded-2xl p-5 border shadow-card ${
+                          isCurrent ? "border-primary ring-1 ring-primary/20" : plan.popular ? "border-primary/50" : "border-border"
+                        }`}>
+                        {isCurrent && (
+                          <span className="inline-block px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-2">Plano Actual</span>
+                        )}
+                        {plan.popular && !isCurrent && (
+                          <span className="inline-block px-2 py-0.5 rounded-full gradient-warm text-primary-foreground text-xs font-semibold mb-2">Popular</span>
+                        )}
+                        <h3 className="font-display font-bold text-foreground">{plan.name}</h3>
+                        <div className="mt-1 mb-3">
+                          <span className="text-2xl font-extrabold font-display text-foreground">{plan.price}</span>
+                          <span className="text-xs text-muted-foreground ml-1">{plan.period}</span>
+                        </div>
+                        <ul className="space-y-1.5 mb-4">
+                          {plan.features.map(f => (
+                            <li key={f} className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Check className="h-3 w-3 text-secondary shrink-0" /> {f}
+                            </li>
+                          ))}
+                        </ul>
+                        <Button variant={isCurrent ? "outline" : "hero"} size="sm" className="w-full rounded-xl"
+                          disabled={isCurrent || changingPlan !== null}
+                          onClick={() => handleChangePlan(plan.id)}>
+                          {changingPlan === plan.id ? <Loader2 className="h-4 w-4 animate-spin" /> : isCurrent ? "Actual" : "Escolher"}
+                        </Button>
                       </div>
-                      <ul className="space-y-1.5 mb-4">
-                        {plan.features.map(f => (
-                          <li key={f} className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Check className="h-3 w-3 text-secondary shrink-0" /> {f}
-                          </li>
-                        ))}
-                      </ul>
-                      <Button variant={plan.current ? "outline" : "hero"} size="sm" className="w-full rounded-xl" disabled={plan.current}>
-                        {plan.current ? "Actual" : "Escolher"}
-                      </Button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -287,10 +306,7 @@ const Settings = () => {
                       <p className="font-medium text-foreground text-sm">{item.label}</p>
                       <p className="text-xs text-muted-foreground">{item.desc}</p>
                     </div>
-                    <Switch
-                      checked={notifPrefs[item.key]}
-                      onCheckedChange={v => setNotifPrefs(p => ({ ...p, [item.key]: v }))}
-                    />
+                    <Switch checked={notifPrefs[item.key]} onCheckedChange={v => setNotifPrefs(p => ({ ...p, [item.key]: v }))} />
                   </div>
                 ))}
               </div>

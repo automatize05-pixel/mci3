@@ -1,13 +1,19 @@
 import { useState, useRef, useEffect } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Send, Loader2, ChefHat, Trash2, UtensilsCrossed, Salad, CookingPot, ShoppingCart } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Sparkles, Send, Loader2, ChefHat, Trash2, UtensilsCrossed, Salad, CookingPot, ShoppingCart, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
+import { Link } from "react-router-dom";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chef`;
+
+const PLAN_LABELS: Record<string, string> = { free: "Gratuito", starter: "Starter", pro: "Pro", elite: "Elite" };
+const AI_LIMITS: Record<string, number> = { free: 5, starter: 50, pro: 9999, elite: 9999 };
 
 const quickActions = [
   { icon: UtensilsCrossed, label: "Tenho frango, arroz e tomate", prompt: "Tenho frango, arroz, tomate, cebola e alho. Que receita posso fazer?" },
@@ -16,44 +22,25 @@ const quickActions = [
   { icon: ShoppingCart, label: "Menu semanal 5000 Kz", prompt: "Planeia um menu semanal para 4 pessoas com orçamento de 5000 Kz." },
 ];
 
-async function streamChat({
-  messages,
-  onDelta,
-  onDone,
-  onError,
-}: {
-  messages: Msg[];
-  onDelta: (text: string) => void;
-  onDone: () => void;
-  onError: (msg: string) => void;
+async function streamChat({ messages, onDelta, onDone, onError }: {
+  messages: Msg[]; onDelta: (text: string) => void; onDone: () => void; onError: (msg: string) => void;
 }) {
   const resp = await fetch(CHAT_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-    },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
     body: JSON.stringify({ messages }),
   });
-
-  if (!resp.ok) {
-    const body = await resp.json().catch(() => ({}));
-    onError(body.error || `Erro ${resp.status}`);
-    return;
-  }
-
+  if (!resp.ok) { const body = await resp.json().catch(() => ({})); onError(body.error || `Erro ${resp.status}`); return; }
   if (!resp.body) { onError("Sem resposta do servidor"); return; }
 
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
   let done = false;
-
   while (!done) {
     const { done: readerDone, value } = await reader.read();
     if (readerDone) break;
     buffer += decoder.decode(value, { stream: true });
-
     let newlineIdx: number;
     while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
       let line = buffer.slice(0, newlineIdx);
@@ -67,14 +54,9 @@ async function streamChat({
         const parsed = JSON.parse(jsonStr);
         const content = parsed.choices?.[0]?.delta?.content as string | undefined;
         if (content) onDelta(content);
-      } catch {
-        buffer = line + "\n" + buffer;
-        break;
-      }
+      } catch { buffer = line + "\n" + buffer; break; }
     }
   }
-
-  // Flush remaining
   if (buffer.trim()) {
     for (let raw of buffer.split("\n")) {
       if (!raw) continue;
@@ -96,16 +78,58 @@ const AIRecipes = () => {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [plan, setPlan] = useState("free");
+  const [aiUsage, setAiUsage] = useState(0);
+  const [loadingPlan, setLoadingPlan] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
+
+  const aiLimit = AI_LIMITS[plan] || 5;
+  const isUnlimited = aiLimit >= 9999;
+  const isLimitReached = !isUnlimited && aiUsage >= aiLimit;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    const loadPlan = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setLoadingPlan(false); return; }
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const [{ data: subData }, { data: usageData }] = await Promise.all([
+        supabase.from("subscriptions").select("plan").eq("user_id", user.id).single(),
+        supabase.from("ai_usage_log").select("usage_count").eq("user_id", user.id).eq("month_year", currentMonth).single(),
+      ]);
+      setPlan((subData as any)?.plan || "free");
+      setAiUsage(usageData?.usage_count || 0);
+      setLoadingPlan(false);
+    };
+    loadPlan();
+  }, []);
+
+  const incrementUsage = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const { data: existing } = await supabase.from("ai_usage_log")
+      .select("id, usage_count").eq("user_id", user.id).eq("month_year", currentMonth).single();
+    if (existing) {
+      await supabase.from("ai_usage_log").update({ usage_count: existing.usage_count + 1 }).eq("id", existing.id);
+      setAiUsage(existing.usage_count + 1);
+    } else {
+      await supabase.from("ai_usage_log").insert({ user_id: user.id, month_year: currentMonth, usage_count: 1 });
+      setAiUsage(1);
+    }
+  };
+
   const send = async (text: string) => {
     if (!text.trim() || isLoading) return;
+    if (isLimitReached) {
+      toast({ title: "Limite atingido", description: `Atingiu o limite de ${aiLimit} pedidos este mês. Faça upgrade do plano!`, variant: "destructive" });
+      return;
+    }
     const userMsg: Msg = { role: "user", content: text.trim() };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
@@ -127,7 +151,10 @@ const AIRecipes = () => {
     await streamChat({
       messages: newMessages,
       onDelta: upsertAssistant,
-      onDone: () => setIsLoading(false),
+      onDone: async () => {
+        setIsLoading(false);
+        await incrementUsage();
+      },
       onError: (msg) => {
         setIsLoading(false);
         toast({ title: "Erro", description: msg, variant: "destructive" });
@@ -136,14 +163,7 @@ const AIRecipes = () => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      send(input);
-    }
-  };
-
-  const clearChat = () => {
-    setMessages([]);
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); }
   };
 
   return (
@@ -157,15 +177,43 @@ const AIRecipes = () => {
             </div>
             <div>
               <h1 className="text-lg font-bold font-display text-foreground">Chef IA</h1>
-              <p className="text-xs text-muted-foreground">O seu assistente de cozinha inteligente</p>
+              <p className="text-xs text-muted-foreground">Plano {PLAN_LABELS[plan]}</p>
             </div>
           </div>
-          {messages.length > 0 && (
-            <Button variant="ghost" size="sm" className="rounded-xl text-xs gap-1 text-muted-foreground" onClick={clearChat}>
-              <Trash2 className="h-3 w-3" /> Limpar
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {!loadingPlan && (
+              <div className="text-right">
+                <p className="text-xs font-semibold text-foreground">
+                  {aiUsage}/{isUnlimited ? "∞" : aiLimit}
+                </p>
+                {!isUnlimited && (
+                  <Progress value={(aiUsage / aiLimit) * 100} className="h-1.5 w-16 mt-0.5" />
+                )}
+              </div>
+            )}
+            {messages.length > 0 && (
+              <Button variant="ghost" size="sm" className="rounded-xl text-xs gap-1 text-muted-foreground" onClick={() => setMessages([])}>
+                <Trash2 className="h-3 w-3" /> Limpar
+              </Button>
+            )}
+          </div>
         </div>
+
+        {/* Limit banner */}
+        {isLimitReached && (
+          <div className="shrink-0 mb-3 p-3 rounded-xl bg-destructive/10 border border-destructive/20 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Lock className="h-4 w-4 text-destructive" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Limite de IA atingido</p>
+                <p className="text-xs text-muted-foreground">Usou {aiUsage}/{aiLimit} pedidos este mês</p>
+              </div>
+            </div>
+            <Link to="/settings">
+              <Button variant="hero" size="sm" className="rounded-xl text-xs">Upgrade</Button>
+            </Link>
+          </div>
+        )}
 
         {/* Chat area */}
         <div className="flex-1 overflow-y-auto rounded-2xl bg-card border border-border shadow-card mb-4 scrollbar-thin">
@@ -180,11 +228,9 @@ const AIRecipes = () => {
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
                 {quickActions.map(action => (
-                  <button
-                    key={action.label}
-                    onClick={() => send(action.prompt)}
-                    className="flex items-center gap-3 p-3 rounded-xl border border-border bg-background hover:bg-muted transition-colors text-left group"
-                  >
+                  <button key={action.label} onClick={() => send(action.prompt)}
+                    disabled={isLimitReached}
+                    className="flex items-center gap-3 p-3 rounded-xl border border-border bg-background hover:bg-muted transition-colors text-left group disabled:opacity-50">
                     <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
                       <action.icon className="h-4 w-4 text-accent-foreground" />
                     </div>
@@ -202,20 +248,14 @@ const AIRecipes = () => {
                       <ChefHat className="h-4 w-4 text-primary-foreground" />
                     </div>
                   )}
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
-                      msg.role === "user"
-                        ? "gradient-warm text-primary-foreground rounded-br-md"
-                        : "bg-muted text-foreground rounded-bl-md"
-                    }`}
-                  >
+                  <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
+                    msg.role === "user" ? "gradient-warm text-primary-foreground rounded-br-md" : "bg-muted text-foreground rounded-bl-md"
+                  }`}>
                     {msg.role === "assistant" ? (
                       <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:font-display prose-headings:text-foreground prose-p:text-foreground/90 prose-li:text-foreground/90 prose-strong:text-foreground">
                         <ReactMarkdown>{msg.content}</ReactMarkdown>
                       </div>
-                    ) : (
-                      <p>{msg.content}</p>
-                    )}
+                    ) : <p>{msg.content}</p>}
                   </div>
                 </div>
               ))}
@@ -236,27 +276,14 @@ const AIRecipes = () => {
 
         {/* Input */}
         <div className="shrink-0 bg-card rounded-2xl border border-border shadow-card p-3">
-          <form
-            onSubmit={e => { e.preventDefault(); send(input); }}
-            className="flex items-end gap-2"
-          >
-            <textarea
-              ref={inputRef}
-              placeholder="Escreva uma mensagem ao Chef IA..."
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={isLoading}
-              rows={1}
+          <form onSubmit={e => { e.preventDefault(); send(input); }} className="flex items-end gap-2">
+            <textarea ref={inputRef} placeholder={isLimitReached ? "Limite atingido — faça upgrade do plano" : "Escreva uma mensagem ao Chef IA..."}
+              value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
+              disabled={isLoading || isLimitReached} rows={1}
               className="flex-1 resize-none text-sm bg-transparent border-none outline-none placeholder:text-muted-foreground text-foreground min-h-[36px] max-h-[120px] py-2"
-              style={{ height: "auto", overflowY: input.split("\n").length > 3 ? "auto" : "hidden" }}
-            />
-            <Button
-              type="submit"
-              size="icon"
-              disabled={isLoading || !input.trim()}
-              className="rounded-xl gradient-warm text-primary-foreground shrink-0"
-            >
+              style={{ height: "auto", overflowY: input.split("\n").length > 3 ? "auto" : "hidden" }} />
+            <Button type="submit" size="icon" disabled={isLoading || !input.trim() || isLimitReached}
+              className="rounded-xl gradient-warm text-primary-foreground shrink-0">
               <Send className="h-4 w-4" />
             </Button>
           </form>

@@ -19,6 +19,7 @@ import UserProfile from "./pages/UserProfile";
 import Search from "./pages/Search";
 import DiscoverChefs from "./pages/DiscoverChefs";
 import Admin from "./pages/Admin";
+import Analytics from "./pages/Analytics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,6 +46,7 @@ const App = () => (
           <Route path="/search" element={<AuthGuard><Search /></AuthGuard>} />
           <Route path="/discover-chefs" element={<AuthGuard><DiscoverChefs /></AuthGuard>} />
           <Route path="/admin" element={<AuthGuard><Admin /></AuthGuard>} />
+          <Route path="/analytics" element={<AuthGuard><Analytics /></AuthGuard>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
