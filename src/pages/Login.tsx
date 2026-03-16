@@ -28,7 +28,6 @@ const Login = () => {
 
       if (error) throw error;
 
-      // Check account status
       const { data: profile } = await supabase
         .from("profiles")
         .select("account_status")
@@ -37,31 +36,19 @@ const Login = () => {
 
       if (profile?.account_status === "pending") {
         await supabase.auth.signOut();
-        toast({
-          title: "Conta pendente",
-          description: "A sua conta está a aguardar aprovação do administrador.",
-          variant: "destructive",
-        });
+        toast({ title: "Conta pendente", description: "A sua conta está a aguardar aprovação.", variant: "destructive" });
         return;
       }
 
       if (profile?.account_status === "suspended") {
         await supabase.auth.signOut();
-        toast({
-          title: "Conta suspensa",
-          description: "A sua conta foi suspensa. Contacte o administrador.",
-          variant: "destructive",
-        });
+        toast({ title: "Conta suspensa", description: "Contacte o administrador.", variant: "destructive" });
         return;
       }
 
       navigate("/feed");
     } catch (error: any) {
-      toast({
-        title: "Erro ao entrar",
-        description: error.message || "Verifique as suas credenciais.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro ao entrar", description: error.message || "Verifique as suas credenciais.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -72,54 +59,34 @@ const Login = () => {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2 mb-6">
-            <img src={logoMci} alt="MCI Logo" className="h-10" />
+            <img src={logoMci} alt="MCI" className="h-10" />
           </Link>
           <h1 className="text-2xl font-bold font-display text-foreground">Bem-vindo de volta</h1>
           <p className="text-muted-foreground mt-1">Entre na sua conta para continuar</p>
         </div>
 
-        <form onSubmit={handleLogin} className="bg-card rounded-xl border border-border p-6 shadow-card space-y-4">
+        <form onSubmit={handleLogin} className="bg-card rounded-2xl border border-border p-6 shadow-card space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="seu@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+            <Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={e => setEmail(e.target.value)} required className="rounded-xl" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Palavra-passe</Label>
             <div className="relative">
-              <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
+              <Input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required className="rounded-xl" />
+              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
-          <Button type="submit" className="w-full" size="lg" disabled={loading}>
+          <Button type="submit" variant="hero" className="w-full rounded-xl" size="lg" disabled={loading}>
             {loading ? "A entrar..." : "Entrar"}
           </Button>
         </form>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
           Não tem conta?{" "}
-          <Link to="/register" className="text-primary font-medium hover:underline">
-            Criar conta
-          </Link>
+          <Link to="/register" className="text-primary font-medium hover:underline">Criar conta</Link>
         </p>
       </div>
     </div>
