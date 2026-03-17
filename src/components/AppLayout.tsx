@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { Home, PlusCircle, BookOpen, Sparkles, MessageSquare, User, LogOut, Search, ChefHat, Menu, X, Settings, Bell, Bookmark } from "lucide-react";
+import { Home, PlusCircle, BookOpen, Sparkles, MessageSquare, User, LogOut, Search, ChefHat, Menu, X, Settings, Bell, Bookmark, PlaySquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logoMci from "@/assets/logo-mci.png";
 
@@ -14,6 +14,7 @@ const mainNav = [
   { href: "/recipes", icon: BookOpen, label: "Receitas" },
   { href: "/ai-recipes", icon: Sparkles, label: "IA Chef" },
   { href: "/messages", icon: MessageSquare, label: "Mensagens" },
+  { href: "/keels", icon: PlaySquare, label: "Keels" },
   { href: "/discover-chefs", icon: ChefHat, label: "Chefs" },
 ];
 
@@ -30,12 +31,53 @@ const mobileBottomNav = [
   { href: "/create-post", icon: PlusCircle, label: "Publicar" },
   { href: "/ai-recipes", icon: Sparkles, label: "IA" },
   { href: "/messages", icon: MessageSquare, label: "Chat" },
+  { href: "/keels", icon: PlaySquare, label: "Keels" },
 ];
 
 const AppLayout = ({ children }: AppLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const initNotifications = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get initial count
+      const { count } = await (supabase as any)
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("is_read", false);
+      
+      setUnreadCount(count || 0);
+
+      // Subscribe to new notifications
+      const channel = supabase
+        .channel("app-notifications")
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            setUnreadCount(prev => prev + 1);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    };
+
+    initNotifications();
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -58,9 +100,12 @@ const AppLayout = ({ children }: AppLayoutProps) => {
                 <Search className="h-4 w-4" />
               </Button>
             </Link>
-            <Link to="/notifications">
+            <Link to="/notifications" className="relative">
               <Button variant="ghost" size="icon" className="rounded-xl">
                 <Bell className="h-4 w-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full ring-2 ring-card" />
+                )}
               </Button>
             </Link>
             <Button
@@ -158,6 +203,11 @@ const AppLayout = ({ children }: AppLayoutProps) => {
             >
               <item.icon className="h-[18px] w-[18px]" />
               {item.label}
+              {item.href === "/notifications" && unreadCount > 0 && (
+                <span className="ml-auto bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  {unreadCount}
+                </span>
+              )}
             </Link>
           ))}
         </nav>

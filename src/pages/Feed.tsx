@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import UserAvatar from "@/components/Avatar";
+import { StoryList } from "@/components/StoryList";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Heart, MessageCircle, PlusCircle, Loader2, Send, MoreHorizontal, Pencil, Trash2, Reply, Share2, Trophy, Sparkles, TrendingUp, Bookmark } from "lucide-react";
@@ -16,7 +17,13 @@ type Post = {
   likes_count: number;
   created_at: string;
   user_id: string;
-  profiles: { name: string | null; username: string | null; profile_picture: string | null; account_type: string } | null;
+  profiles: { 
+    name: string | null; 
+    username: string | null; 
+    profile_picture: string | null; 
+    account_type: string;
+    user_roles: { role: string }[];
+  } | null;
 };
 
 type Comment = {
@@ -25,7 +32,15 @@ type Comment = {
   created_at: string;
   user_id: string;
   parent_id: string | null;
-  profiles: { name: string | null; username: string | null; profile_picture: string | null } | null;
+  profiles: { 
+    name: string | null; 
+    username: string | null; 
+    profile_picture: string | null;
+    account_type: string;
+    user_roles: { role: string }[];
+  } | null;
+  reactions_count?: number;
+  is_liked?: boolean;
 };
 
 const Feed = () => {
@@ -38,10 +53,17 @@ const Feed = () => {
   const [commentsData, setCommentsData] = useState<Record<string, Comment[]>>({});
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
+  const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
   const [editingComment, setEditingComment] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [trendingChefs, setTrendingChefs] = useState<any[]>([]);
+  const [adminIds, setAdminIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+  
+  const fetchAdmins = async () => {
+    const { data } = await (supabase as any).from("user_roles").select("user_id").eq("role", "admin");
+    if (data) setAdminIds(new Set(data.map((r: any) => r.user_id)));
+  };
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -51,16 +73,24 @@ const Feed = () => {
 
   const fetchPosts = async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await (supabase as any)
       .from("posts")
       .select("*, profiles(name, username, profile_picture, account_type)")
       .order("created_at", { ascending: false })
       .limit(50);
+    
+    if (error) {
+      console.error("Error fetching posts:", error);
+      toast({ title: "Erro ao carregar publicações", description: error.message, variant: "destructive" });
+      setLoading(false);
+      return;
+    }
+
     setPosts((data || []) as any);
 
     if (data && data.length > 0) {
       const postIds = data.map((p: any) => p.id);
-      const { data: likes } = await supabase.from("likes").select("post_id").in("post_id", postIds);
+      const { data: likes } = await (supabase as any).from("likes").select("post_id").in("post_id", postIds);
       const counts: Record<string, number> = {};
       postIds.forEach(id => counts[id] = 0);
       likes?.forEach((l: any) => { counts[l.post_id] = (counts[l.post_id] || 0) + 1; });
@@ -71,20 +101,23 @@ const Feed = () => {
 
   const fetchMyLikes = useCallback(async () => {
     if (!currentUserId) return;
-    const { data } = await supabase.from("likes").select("post_id").eq("user_id", currentUserId);
-    setLikedPosts(new Set(data?.map((l: any) => l.post_id) || []));
+    const { data: postLikes } = await (supabase as any).from("likes").select("post_id").eq("user_id", currentUserId);
+    setLikedPosts(new Set(postLikes?.map((l: any) => l.post_id) || []));
+
+    const { data: commentLikes } = await (supabase as any).from("comment_reactions").select("comment_id").eq("user_id", currentUserId).eq("reaction_type", "like");
+    setLikedComments(new Set(commentLikes?.map((l: any) => l.comment_id) || []));
   }, [currentUserId]);
 
   const fetchTrendingChefs = async () => {
-    const { data: profiles } = await supabase
+    const { data: profiles } = await (supabase as any)
       .from("profiles")
-      .select("id, name, username, profile_picture")
+      .select("id, name, username, profile_picture, account_type")
       .eq("account_type", "chef")
       .eq("account_status", "approved")
       .limit(5);
     if (profiles && profiles.length > 0) {
       const ids = profiles.map(p => p.id);
-      const { data: followers } = await supabase.from("followers").select("following_id").in("following_id", ids);
+      const { data: followers } = await (supabase as any).from("followers").select("following_id").in("following_id", ids);
       const counts: Record<string, number> = {};
       ids.forEach(id => counts[id] = 0);
       followers?.forEach((f: any) => { counts[f.following_id] = (counts[f.following_id] || 0) + 1; });
@@ -95,18 +128,22 @@ const Feed = () => {
     }
   };
 
-  useEffect(() => { fetchPosts(); fetchTrendingChefs(); }, []);
+  useEffect(() => { 
+    fetchPosts(); 
+    fetchTrendingChefs(); 
+    fetchAdmins();
+  }, []);
   useEffect(() => { if (currentUserId) fetchMyLikes(); }, [currentUserId, fetchMyLikes]);
 
   const toggleLike = async (postId: string) => {
     if (!currentUserId) return;
     const isLiked = likedPosts.has(postId);
     if (isLiked) {
-      await supabase.from("likes").delete().eq("user_id", currentUserId).eq("post_id", postId);
+      await (supabase as any).from("likes").delete().eq("user_id", currentUserId).eq("post_id", postId);
       setLikedPosts(prev => { const n = new Set(prev); n.delete(postId); return n; });
       setLikeCounts(prev => ({ ...prev, [postId]: Math.max(0, (prev[postId] || 0) - 1) }));
     } else {
-      await supabase.from("likes").insert({ user_id: currentUserId, post_id: postId });
+      await (supabase as any).from("likes").insert({ user_id: currentUserId, post_id: postId });
       setLikedPosts(prev => new Set(prev).add(postId));
       setLikeCounts(prev => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
     }
@@ -116,12 +153,27 @@ const Feed = () => {
     const isOpen = expandedComments[postId];
     setExpandedComments(prev => ({ ...prev, [postId]: !isOpen }));
     if (!isOpen && !commentsData[postId]) {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("comments")
-        .select("*, profiles(name, username, profile_picture)")
+        .select("*, profiles(name, username, profile_picture, account_type)")
         .eq("post_id", postId)
         .order("created_at", { ascending: true });
-      setCommentsData(prev => ({ ...prev, [postId]: (data || []) as any }));
+      
+      if (data && data.length > 0) {
+        const commentIds = data.map(c => c.id);
+        const { data: reactions } = await (supabase as any).from("comment_reactions").select("comment_id").in("comment_id", commentIds);
+        const counts: Record<string, number> = {};
+        commentIds.forEach(id => counts[id] = 0);
+        reactions?.forEach((r: any) => { counts[r.comment_id] = (counts[r.comment_id] || 0) + 1; });
+        
+        const enriched = data.map(c => ({
+          ...c,
+          reactions_count: counts[c.id] || 0
+        }));
+        setCommentsData(prev => ({ ...prev, [postId]: enriched as any }));
+      } else {
+        setCommentsData(prev => ({ ...prev, [postId]: [] }));
+      }
     }
   };
 
@@ -129,19 +181,39 @@ const Feed = () => {
     const text = commentText[postId]?.trim();
     if (!text || !currentUserId) return;
     const parentId = replyTo[postId]?.id || null;
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("comments")
       .insert({ post_id: postId, user_id: currentUserId, content: text, parent_id: parentId })
-      .select("*, profiles(name, username, profile_picture)")
+      .select("*, profiles(name, username, profile_picture, account_type)")
       .single();
     if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
-    setCommentsData(prev => ({ ...prev, [postId]: [...(prev[postId] || []), data as any] }));
+    setCommentsData(prev => ({ ...prev, [postId]: [...(prev[postId] || []), { ...data, reactions_count: 0 } as any] }));
     setCommentText(prev => ({ ...prev, [postId]: "" }));
     setReplyTo(prev => ({ ...prev, [postId]: null }));
   };
 
+  const toggleCommentLike = async (postId: string, commentId: string) => {
+    if (!currentUserId) return;
+    const isLiked = likedComments.has(commentId);
+    if (isLiked) {
+      await (supabase as any).from("comment_reactions").delete().eq("user_id", currentUserId).eq("comment_id", commentId).eq("reaction_type", "like");
+      setLikedComments(prev => { const n = new Set(prev); n.delete(commentId); return n; });
+      setCommentsData(prev => ({
+        ...prev,
+        [postId]: prev[postId].map(c => c.id === commentId ? { ...c, reactions_count: Math.max(0, (c.reactions_count || 0) - 1) } : c)
+      }));
+    } else {
+      await (supabase as any).from("comment_reactions").insert({ user_id: currentUserId, comment_id: commentId, reaction_type: "like" });
+      setLikedComments(prev => new Set(prev).add(commentId));
+      setCommentsData(prev => ({
+        ...prev,
+        [postId]: prev[postId].map(c => c.id === commentId ? { ...c, reactions_count: (c.reactions_count || 0) + 1 } : c)
+      }));
+    }
+  };
+
   const deleteComment = async (postId: string, commentId: string) => {
-    const { error } = await supabase.from("comments").delete().eq("id", commentId);
+    const { error } = await (supabase as any).from("comments").delete().eq("id", commentId);
     if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
     setCommentsData(prev => ({
       ...prev,
@@ -151,7 +223,7 @@ const Feed = () => {
 
   const updateComment = async (postId: string, commentId: string) => {
     if (!editText.trim()) return;
-    const { error } = await supabase.from("comments").update({ content: editText.trim() }).eq("id", commentId);
+    const { error } = await (supabase as any).from("comments").update({ content: editText.trim() }).eq("id", commentId);
     if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
     setCommentsData(prev => ({
       ...prev,
@@ -186,7 +258,7 @@ const Feed = () => {
     return comments.map(c => (
       <div key={c.id} className={`${depth > 0 ? "ml-8 border-l-2 border-border pl-3" : ""}`}>
         <div className="flex gap-2 group">
-          <UserAvatar userId={c.user_id} src={(c.profiles as any)?.profile_picture} name={(c.profiles as any)?.name} username={(c.profiles as any)?.username} size="sm" />
+          <UserAvatar userId={c.user_id} src={(c.profiles as any)?.profile_picture} name={(c.profiles as any)?.name} username={(c.profiles as any)?.username} isVerified={adminIds.has(c.user_id)} size="sm" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <Link to={`/user/${c.user_id}`} className="text-xs font-semibold text-foreground hover:underline">
@@ -203,12 +275,21 @@ const Feed = () => {
             ) : (
               <p className="text-sm text-muted-foreground">{c.content}</p>
             )}
-            <button
-              onClick={() => setReplyTo(prev => ({ ...prev, [postId]: { id: c.id, name: (c.profiles as any)?.name || "..." } }))}
-              className="text-[10px] text-muted-foreground hover:text-primary font-medium mt-1"
-            >
-              Responder
-            </button>
+            <div className="flex items-center gap-3 mt-1">
+              <button
+                onClick={() => setReplyTo(prev => ({ ...prev, [postId]: { id: c.id, name: (c.profiles as any)?.name || "..." } }))}
+                className="text-[10px] text-muted-foreground hover:text-primary font-medium"
+              >
+                Responder
+              </button>
+              <button
+                onClick={() => toggleCommentLike(postId, c.id)}
+                className={`flex items-center gap-1 text-[10px] font-medium transition-colors ${likedComments.has(c.id) ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
+              >
+                <Heart className={`h-3 w-3 ${likedComments.has(c.id) ? "fill-primary" : ""}`} />
+                {c.reactions_count || 0}
+              </button>
+            </div>
           </div>
           {(c.user_id === currentUserId || post?.user_id === currentUserId) && (
             <DropdownMenu>
@@ -249,6 +330,8 @@ const Feed = () => {
                 </Button>
               </Link>
             </div>
+            
+            <StoryList />
 
             {loading ? (
               <div className="flex justify-center py-16">
@@ -272,6 +355,7 @@ const Feed = () => {
                         name={(post.profiles as any)?.name}
                         username={(post.profiles as any)?.username}
                         isChef={(post.profiles as any)?.account_type === "chef"}
+                        isVerified={adminIds.has(post.user_id)}
                       />
                       <div className="min-w-0 flex-1">
                         <Link to={`/user/${post.user_id}`} className="font-semibold text-foreground text-sm hover:underline">
@@ -377,7 +461,15 @@ const Feed = () => {
               <div className="space-y-3">
                 {trendingChefs.map(chef => (
                   <Link key={chef.id} to={`/user/${chef.id}`} className="flex items-center gap-3 group">
-                    <UserAvatar src={chef.profile_picture} name={chef.name} username={chef.username} isChef size="sm" linked={false} />
+                    <UserAvatar 
+                      src={chef.profile_picture} 
+                      name={chef.name} 
+                      username={chef.username} 
+                      isChef={chef.account_type === 'chef'} 
+                      isVerified={adminIds.has(chef.id)}
+                      size="sm" 
+                      linked={false} 
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground group-hover:underline truncate">{chef.name || chef.username}</p>
                       <p className="text-[10px] text-muted-foreground">{chef.followers_count} seguidores</p>

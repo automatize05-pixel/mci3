@@ -84,6 +84,12 @@ const Messages = () => {
         const msg = payload.new as Message;
         if ((msg.sender_id === currentUserId && msg.receiver_id === selectedUser.id) ||
             (msg.sender_id === selectedUser.id && msg.receiver_id === currentUserId)) {
+          
+          if (msg.sender_id !== currentUserId) {
+            const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3");
+            audio.play().catch(e => console.log("Audio play failed:", e));
+          }
+
           setMessages(prev => [...prev, msg]);
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
         }
