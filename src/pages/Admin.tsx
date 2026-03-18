@@ -68,8 +68,27 @@ const Admin = () => {
     setLoading(false);
   };
 
+  const [dbStatus, setDbStatus] = useState<Record<string, { exists: boolean; error?: string }>>({});
+
+  const checkDatabase = async () => {
+    const tables = ['communities', 'community_members', 'subscription_requests'];
+    const status: Record<string, { exists: boolean; error?: string }> = {};
+    
+    for (const table of tables) {
+      const { error } = await (supabase as any).from(table).select('count', { count: 'exact', head: true });
+      status[table] = { exists: !error, error: error?.message };
+    }
+    
+    // Check for column on posts
+    const { error: colError } = await (supabase as any).from('posts').select('community_id').limit(1);
+    status['posts.community_id'] = { exists: !colError, error: colError?.message };
+    
+    setDbStatus(status);
+  };
+
   useEffect(() => {
     fetchData();
+    checkDatabase();
   }, []);
 
   const updateUserStatus = async (userId: string, status: "approved" | "suspended" | "pending") => {
@@ -185,6 +204,36 @@ const Admin = () => {
               <p className="text-2xl font-bold text-foreground">{s.value}</p>
             </div>
           ))}
+        </div>
+
+        {/* Database Status Diagnostics */}
+        <div className="bg-card rounded-xl border border-border p-5 mb-8 shadow-card">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-display font-bold text-foreground flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" /> Diagnóstico da Base de Dados
+            </h3>
+            <Button variant="outline" size="sm" onClick={checkDatabase} className="rounded-lg h-8 text-xs">Atualizar</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            {Object.entries(dbStatus).map(([item, status]) => (
+              <div key={item} className={`flex items-center justify-between p-3 rounded-xl border ${status.exists ? 'bg-green-500/5 border-green-500/20' : 'bg-red-500/5 border-red-500/20'}`}>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{item}</p>
+                  <p className={`text-xs font-semibold truncate ${status.exists ? 'text-green-600' : 'text-red-600'}`}>
+                    {status.exists ? 'EXISTE' : 'FALTA'}
+                  </p>
+                </div>
+                {status.exists ? <CheckCircle className="h-4 w-4 text-green-500 shrink-0" /> : <XCircle className="h-4 w-4 text-red-500 shrink-0" />}
+              </div>
+            ))}
+          </div>
+          {!Object.values(dbStatus).every(s => s.exists) && (
+            <div className="mt-4 p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-xl">
+              <p className="text-xs text-yellow-700 leading-relaxed">
+                <strong>Atenção:</strong> Foram detetados elementos em falta na base de dados. Isto impedirá o funcionamento correto das Comunidades e do Checkout. Por favor, contacte o suporte técnico para aplicar as migrações SQL necessárias.
+              </p>
+            </div>
+          )}
         </div>
 
         <Tabs defaultValue="users">

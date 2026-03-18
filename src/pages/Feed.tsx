@@ -79,7 +79,7 @@ const Feed = () => {
     setLoading(true);
     const { data, error } = await (supabase as any)
       .from("posts")
-      .select("*, profiles(name, username, profile_picture, account_type), communities(id, title)")
+      .select("*, profiles(name, username, profile_picture, account_type)")
       .order("created_at", { ascending: false })
       .limit(50);
     

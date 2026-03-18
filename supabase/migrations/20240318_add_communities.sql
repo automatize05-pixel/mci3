@@ -73,8 +73,8 @@ CREATE POLICY "Owners can manage content" ON public.community_content FOR ALL US
     )
 );
 
--- AI Usage tracking bypass for Admins (Conceptual, enforced in code)
--- No SQL change needed if code handles it, but let's ensure subscriptions exist for all
-INSERT INTO public.user_subscriptions (user_id, plan_type, status)
-SELECT id, 'enterprise', 'active' FROM public.profiles
+-- No manual insert needed here as handle_new_user now handles free subscriptions.
+-- If we want to ensure all existing users have a record:
+INSERT INTO public.subscriptions (user_id, plan)
+SELECT id, 'free' FROM public.profiles
 ON CONFLICT (user_id) DO NOTHING;
