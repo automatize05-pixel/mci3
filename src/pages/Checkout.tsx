@@ -37,6 +37,21 @@ const Checkout = () => {
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(searchParams.get("plan"));
+  const [adminId, setAdminId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchAdminId = async () => {
+      const { data } = await (supabase as any)
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "admin")
+        .limit(1)
+        .maybeSingle();
+      
+      if (data) setAdminId(data.user_id);
+    };
+    fetchAdminId();
+  }, []);
 
   const plan = plans.find(p => p.id === selectedPlan) || plans[1];
 
@@ -65,7 +80,12 @@ const Checkout = () => {
         title: "Pedido enviado!", 
         description: "O seu pedido está pendente de aprovação após o pagamento.",
       });
-      navigate("/settings");
+      // Redirect to admin profile to message them
+      if (adminId) {
+        navigate(`/user/${adminId}`);
+      } else {
+        navigate("/settings");
+      }
     }
     setLoading(false);
   };

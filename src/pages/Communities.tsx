@@ -83,14 +83,16 @@ const Communities = () => {
           )}
         </div>
 
-        {!canCreate && userProfile?.account_type === "chef" && (
+        {!canCreate && (
           <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6 mb-8 flex items-center gap-4">
             <div className="bg-primary/10 p-3 rounded-full">
               <Lock className="h-6 w-6 text-primary" />
             </div>
             <div className="flex-1">
               <h3 className="font-bold text-foreground font-display">Monetize o seu Talento</h3>
-              <p className="text-sm text-muted-foreground">Atualize para um plano Pro ou Elite para criar a sua própria comunidade e dar formações.</p>
+              <p className="text-sm text-muted-foreground">
+                Para criares a tua comunidade, torna-te um chef premium e ative o plano para ativares a tua comunidade.
+              </p>
             </div>
             <Link to="/settings">
               <Button size="sm" variant="outline" className="rounded-lg">Ver Planos</Button>
