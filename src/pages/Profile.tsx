@@ -141,6 +141,7 @@ const Profile = () => {
                 name={profile.name}
                 username={profile.username}
                 isChef={profile.account_type === "chef"}
+                isVerified={isAdmin}
                 size="xl"
                 linked={false}
               />

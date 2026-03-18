@@ -9,7 +9,7 @@ import { ChefHat, Users, BookOpen, Heart, Loader2, MessageSquare, UserPlus, User
 import { useToast } from "@/hooks/use-toast";
 
 const UserProfile = () => {
-  const { userId } = useParams<{ userId: string }>();
+  const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
   const [profile, setProfile] = useState<any>(null);
   const [posts, setPosts] = useState<any[]>([]);
@@ -31,12 +31,13 @@ const UserProfile = () => {
     if (!userId) return;
     const load = async () => {
       setLoading(true);
-      const [profileRes, postsRes, recipesRes, followersRes, followingRes] = await Promise.all([
+      const [profileRes, postsRes, recipesRes, followersRes, followingRes, roleRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", userId).single(),
         supabase.from("posts").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
         supabase.from("recipes").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
         supabase.from("followers").select("*", { count: "exact", head: true }).eq("following_id", userId),
         supabase.from("followers").select("*", { count: "exact", head: true }).eq("follower_id", userId),
+        supabase.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle(),
       ]);
 
       setProfile(profileRes.data);
@@ -44,6 +45,7 @@ const UserProfile = () => {
       setRecipes(recipesRes.data || []);
       setFollowersCount(followersRes.count || 0);
       setFollowingCount(followingRes.count || 0);
+      setIsAdmin(!!roleRes.data);
 
       // Total likes on user's posts
       if (postsRes.data && postsRes.data.length > 0) {
@@ -81,6 +83,9 @@ const UserProfile = () => {
   const avgLikes = posts.length > 0 ? Math.round(totalLikes / posts.length) : 0;
   const engagementRate = followersCount > 0 ? ((totalLikes / Math.max(posts.length, 1)) / followersCount * 100).toFixed(1) : "0";
 
+  // Display name logic
+  const displayName = profile?.name || profile?.username || "Utilizador";
+
   if (loading) {
     return <AppLayout><div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></AppLayout>;
   }
@@ -100,11 +105,18 @@ const UserProfile = () => {
             {/* Avatar overlapping cover */}
             <div className="flex flex-col sm:flex-row sm:items-end gap-4 -mt-12 mb-4">
               <div className="ring-4 ring-card rounded-full">
-                <UserAvatar src={profile.profile_picture} name={profile.name} username={profile.username} isChef={isChef} size="xl" linked={false} />
+                <UserAvatar src={profile.profile_picture} name={profile.name} username={profile.username} isChef={isChef} isVerified={isAdmin} size="xl" linked={false} />
               </div>
               <div className="flex-1 min-w-0 sm:pb-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-xl font-bold font-display text-foreground">{profile.name || profile.username}</h1>
+                  <h1 className="text-xl font-bold font-display text-foreground">{displayName}</h1>
+                  {isAdmin && (
+                    <div className="text-[#1d9bf0]">
+                      <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
+                        <path d="M22.25 12c0-1.43-.88-2.67-2.19-3.34.46-1.39.2-2.9-.81-3.91s-2.52-1.27-3.91-.81c-.67-1.31-1.91-2.19-3.34-2.19s-2.67.88-3.33 2.19c-1.4-.46-2.91-.2-3.92.81s-1.26 2.52-.8 3.91c-1.31.67-2.2 1.91-2.2 3.34s.89 2.67 2.2 3.34c-.46 1.39-.21 2.9.8 3.91s2.52 1.26 3.91.81c.67 1.31 1.91 2.19 3.34 2.19s2.67-.88 3.34-2.19c1.39.45 2.9.2 3.91-.81s1.27-2.52.81-3.91c1.31-.67 2.19-1.91 2.19-3.34zm-11.71 4.2l-3.53-3.53 1.41-1.41 2.12 2.12 4.96-4.96L16.91 9.84l-6.37 6.36z" />
+                      </svg>
+                    </div>
+                  )}
                   {isChef && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-chef/10 text-chef text-xs font-semibold">
                       <ChefHat className="h-3 w-3" /> Chef
