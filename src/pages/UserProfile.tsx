@@ -108,7 +108,7 @@ const UserProfile = () => {
               {/* Avatar - half overlapping cover */}
               <div className="absolute -top-16 left-1/2 sm:left-0 -translate-x-1/2 sm:translate-x-0">
                 <div className="ring-4 ring-card rounded-full bg-card shadow-lg overflow-hidden">
-                  <UserAvatar src={profile.profile_picture} name={profile.name} username={profile.username} isChef={isChef} size="xl" linked={false} />
+                  <UserAvatar src={profile.profile_picture} name={profile.name} username={profile.username} size="xl" linked={false} />
                 </div>
               </div>
 
