@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 const UserProfile = () => {
   const { userId } = useParams<{ userId: string }>();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isViewerAdmin, setIsViewerAdmin] = useState(false);
   const { toast } = useToast();
   const [profile, setProfile] = useState<any>(null);
   const [posts, setPosts] = useState<any[]>([]);
@@ -19,6 +20,7 @@ const UserProfile = () => {
   const [followingCount, setFollowingCount] = useState(0);
   const [totalLikes, setTotalLikes] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [userCommunities, setUserCommunities] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -32,7 +34,7 @@ const UserProfile = () => {
     if (!userId) return;
     const load = async () => {
       setLoading(true);
-      const [profileRes, postsRes, recipesRes, followersRes, followingRes, roleRes] = await Promise.all([
+      const [profileRes, postsRes, recipesRes, followersRes, followingRes, roleRes, commRes, viewerRoleRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", userId).single(),
         supabase.from("posts")
           .select("*, likes_count:likes(count)")
@@ -42,7 +44,9 @@ const UserProfile = () => {
         supabase.from("followers").select("*", { count: "exact", head: true }).eq("following_id", userId),
         supabase.from("followers").select("*", { count: "exact", head: true }).eq("follower_id", userId),
         supabase.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle(),
-      ]);
+        (supabase as any).from("communities").select("*").eq("owner_id", userId),
+        currentUserId ? supabase.from("user_roles").select("role").eq("user_id", currentUserId).eq("role", "admin").maybeSingle() : Promise.resolve({ data: null }),
+      ]) as any[];
 
       // Process posts to have a flat likes_count
       const processedPosts = (postsRes.data || []).map((post: any) => ({
@@ -56,6 +60,8 @@ const UserProfile = () => {
       setFollowersCount(followersRes.count || 0);
       setFollowingCount(followingRes.count || 0);
       setIsAdmin(!!roleRes.data);
+      setUserCommunities(commRes.data || []);
+      setIsViewerAdmin(!!viewerRoleRes.data);
 
       // Total likes on user's posts
       if (postsRes.data && postsRes.data.length > 0) {
@@ -117,7 +123,7 @@ const UserProfile = () => {
               {/* Avatar - half overlapping cover */}
               <div className="absolute -top-16 left-1/2 sm:left-0 -translate-x-1/2 sm:translate-x-0">
                 <div className="ring-4 ring-card rounded-full bg-card shadow-lg overflow-hidden">
-                  <UserAvatar src={profile.profile_picture} name={profile.name} username={profile.username} size="xl" linked={false} />
+                  <UserAvatar src={profile.profile_picture} name={profile.name} username={profile.username} size="xl" linked={false} isVerified={isAdmin} isChef={isChef} />
                 </div>
               </div>
 
@@ -150,7 +156,7 @@ const UserProfile = () => {
                         <Button onClick={toggleFollow} variant={isFollowing ? "outline" : "hero"} className="rounded-xl px-8 h-10 font-bold" size="sm">
                           {isFollowing ? <><UserMinus className="h-4 w-4 mr-2" /> A seguir</> : <><UserPlus className="h-4 w-4 mr-2" /> Seguir</>}
                         </Button>
-                        <Link to="/messages">
+                        <Link to={`/messages?userId=${userId}`}>
                           <Button variant="outline" className="rounded-xl w-10 h-10 p-0 border-2 hover:bg-muted" size="sm">
                             <MessageSquare className="h-4 w-4 text-foreground" />
                           </Button>
@@ -205,6 +211,7 @@ const UserProfile = () => {
           <TabsList className="w-full rounded-xl bg-muted p-1">
             <TabsTrigger value="posts" className="flex-1 rounded-lg text-sm">Posts ({posts.length})</TabsTrigger>
             {isChef && <TabsTrigger value="recipes" className="flex-1 rounded-lg text-sm">Receitas ({recipes.length})</TabsTrigger>}
+            {(isChef || isViewerAdmin) && userCommunities.length > 0 && <TabsTrigger value="communities" className="flex-1 rounded-lg text-sm">Comunidades ({userCommunities.length})</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="posts" className="mt-4">
@@ -259,6 +266,24 @@ const UserProfile = () => {
                   ))}
                 </div>
               )}
+            </TabsContent>
+          )}
+
+          {(isChef || isViewerAdmin) && userCommunities.length > 0 && (
+            <TabsContent value="communities" className="mt-4 space-y-3">
+              {userCommunities.map(comm => (
+                <Link key={comm.id} to={`/community/${comm.id}`} className="block">
+                  <div className="bg-card rounded-2xl border border-border p-4 shadow-card flex items-center gap-4 hover:border-primary/50 transition-colors">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <Users className="h-6 w-6 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-foreground text-sm truncate">{comm.title}</h3>
+                      <p className="text-xs text-muted-foreground line-clamp-1">{comm.description}</p>
+                    </div>
+                  </div>
+                </Link>
+              ))}
             </TabsContent>
           )}
         </Tabs>

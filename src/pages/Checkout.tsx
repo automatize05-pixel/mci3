@@ -2,42 +2,46 @@ import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Check, CreditCard, ShieldCheck, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useSearchParams, useNavigate } from "react-router-dom";
 
 const plans = [
   {
-    name: "Gratuito",
-    price: "0€",
+    id: "starter",
+    name: "Chef Starter",
+    price: "3.500 Kz",
     description: "Para quem está a começar na cozinha.",
-    features: ["5 receitas por mês", "Acesso à comunidade", "Dicas básicas de IA"],
-    type: "free"
+    features: ["50 receitas IA/mês", "Planeamento semanal", "Badge Starter"],
   },
   {
-    name: "Pro",
-    price: "9.99€",
-    description: "Para os amantes da cozinha criativa.",
-    features: ["Receitas ilimitadas", "Modo Multimodal (Foto + Texto)", "Histórico ilimitado", "Acesso antecipado"],
-    type: "pro",
+    id: "pro",
+    name: "Chef Pro",
+    price: "7.000 Kz",
+    description: "Para os amantes da cozinha profissional.",
+    features: ["IA ilimitada", "Analytics", "Badge Pro", "Monetização"],
     highlight: true
   },
   {
-    name: "Enterprise",
-    price: "24.99€",
-    description: "Para chefs profissionais e empresas.",
-    features: ["Tudo no Pro", "Suporte prioritário", "Consultoria de Cardápio", "API Access"],
-    type: "enterprise"
+    id: "elite",
+    name: "Chef Elite",
+    price: "15.000 Kz",
+    description: "Para grandes chefs e formadores.",
+    features: ["Tudo do Pro", "Consultoria IA", "Destaque", "API access"],
   }
 ];
 
 const Checkout = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const [loading, setLoading] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(searchParams.get("plan"));
 
-  const handleSubscribe = async (planType: string) => {
-    setLoading(planType);
+  const plan = plans.find(p => p.id === selectedPlan) || plans[1];
+
+  const handleConfirmRequest = async () => {
+    setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
@@ -46,25 +50,24 @@ const Checkout = () => {
       return;
     }
 
-    // Simulate payment processing
-    setTimeout(async () => {
-      const { error } = await (supabase as any)
-        .from("user_subscriptions")
-        .upsert({ 
-          user_id: user.id, 
-          plan_type: planType, 
-          status: 'active',
-          updated_at: new Date().toISOString()
-        });
+    const { error } = await (supabase as any)
+      .from("subscription_requests")
+      .insert({ 
+        user_id: user.id, 
+        plan_id: plan.id, 
+        status: 'pending'
+      });
 
-      if (error) {
-        toast({ title: "Erro no pagamento", description: error.message, variant: "destructive" });
-      } else {
-        toast({ title: "Parabéns!", description: `Agora és um membro ${planType.toUpperCase()}!` });
-        navigate("/feed");
-      }
-      setLoading(null);
-    }, 1500);
+    if (error) {
+      toast({ title: "Erro no pedido", description: error.message, variant: "destructive" });
+    } else {
+      toast({ 
+        title: "Pedido enviado!", 
+        description: "O seu pedido está pendente de aprovação após o pagamento.",
+      });
+      navigate("/settings");
+    }
+    setLoading(false);
   };
 
   return (
@@ -77,46 +80,52 @@ const Checkout = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {plans.map((plan) => (
-            <div 
-              key={plan.name}
-              className={`relative bg-card rounded-3xl border ${plan.highlight ? 'border-primary ring-2 ring-primary/20 shadow-2xl' : 'border-border shadow-card'} p-8 flex flex-col transition-all hover:translate-y-[-4px]`}
-            >
-              {plan.highlight && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                  Mais Popular
-                </div>
-              )}
-
-              <div className="mb-8">
-                <h3 className="text-2xl font-bold font-display text-foreground mb-2">{plan.name}</h3>
-                <div className="flex items-baseline gap-1 mb-4">
-                  <span className="text-4xl font-bold text-foreground">{plan.price}</span>
-                  <span className="text-muted-foreground">/mês</span>
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">{plan.description}</p>
-              </div>
-
-              <div className="space-y-4 mb-10 flex-1">
-                {plan.features.map((feature) => (
-                  <div key={feature} className="flex items-start gap-3 text-sm text-foreground/80">
-                    <Check className="h-5 w-5 text-primary shrink-0" />
-                    <span>{feature}</span>
-                  </div>
-                ))}
-              </div>
-
-              <Button 
-                variant={plan.highlight ? "hero" : "outline"} 
-                className="w-full rounded-2xl h-12 text-base font-bold transition-all active:scale-95"
-                onClick={() => handleSubscribe(plan.type)}
-                disabled={!!loading}
-              >
-                {loading === plan.type ? "A processar..." : "Começar Agora"}
-              </Button>
+        <div className="max-w-xl mx-auto">
+          <div className="bg-card rounded-3xl border-2 border-primary shadow-2xl p-8 flex flex-col mb-8">
+            <div className="mb-6 text-center">
+              <h3 className="text-2xl font-bold font-display text-foreground mb-2">Pagamento por Referência</h3>
+              <p className="text-sm text-muted-foreground">Utilize os dados abaixo para efectuar o pagamento via PayPay</p>
             </div>
-          ))}
+
+            <div className="space-y-4 bg-muted/50 rounded-2xl p-6 mb-8 border border-border">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground text-sm">Plano Seleccionado:</span>
+                <span className="font-bold text-foreground">{plan.name}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground text-sm">Valor a Pagar:</span>
+                <span className="font-bold text-primary text-xl">{plan.price}</span>
+              </div>
+              <div className="h-px bg-border my-2" />
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground text-sm font-semibold">Entidade:</span>
+                <span className="font-black text-foreground text-lg tracking-widest">10116</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground text-sm font-semibold">Referência:</span>
+                <span className="font-black text-foreground text-lg tracking-widest">947005277</span>
+              </div>
+            </div>
+
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mb-8">
+              <p className="text-xs text-primary font-medium text-center leading-relaxed">
+                "depois do pagamento, entre em contacto com o admin para dar acesso ao plano escolhido"
+              </p>
+            </div>
+
+            <Button 
+              variant="hero" 
+              className="w-full rounded-2xl h-14 text-lg font-bold shadow-warm transition-all active:scale-95"
+              onClick={handleConfirmRequest}
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : "Já fiz o Pagamento"}
+            </Button>
+            
+            <p className="text-[10px] text-muted-foreground text-center mt-4 uppercase tracking-widest">
+              A activação será feita manualmente pelo administrador
+            </p>
+          </div>
         </div>
 
         <div className="mt-20 flex flex-wrap justify-center gap-12 text-muted-foreground/40">

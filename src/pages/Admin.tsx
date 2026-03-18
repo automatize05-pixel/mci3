@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Shield, Users, FileText, BookOpen, MessageSquare, CheckCircle, XCircle, Ban, Trash2, Loader2 } from "lucide-react";
+import { Shield, Users, FileText, BookOpen, MessageSquare, CheckCircle, XCircle, Ban, Trash2, Loader2, CreditCard } from "lucide-react";
 
 type Profile = {
   id: string;
@@ -38,28 +38,32 @@ const Admin = () => {
   const [users, setUsers] = useState<Profile[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [subscriptionRequests, setSubscriptionRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [stats, setStats] = useState({ total: 0, approved: 0, pending: 0, posts: 0, recipes: 0 });
+  const [stats, setStats] = useState({ total: 0, approved: 0, pending: 0, posts: 0, recipes: 0, subRequests: 0 });
 
   const fetchData = async () => {
     setLoading(true);
-    const [usersRes, postsRes, recipesRes] = await Promise.all([
+    const [usersRes, postsRes, recipesRes, subRequestsRes] = await Promise.all([
       supabase.from("profiles").select("*").order("created_at", { ascending: false }),
       supabase.from("posts").select("*, profiles(name, username)").order("created_at", { ascending: false }).limit(50),
       supabase.from("recipes").select("*, profiles(name, username)").order("created_at", { ascending: false }).limit(50),
+      (supabase as any).from("subscription_requests").select("*, profiles(name, username, email)").order("created_at", { ascending: false }),
     ]);
 
     const u = (usersRes.data || []) as Profile[];
     setUsers(u);
     setPosts((postsRes.data || []) as any);
     setRecipes((recipesRes.data || []) as any);
+    setSubscriptionRequests(subRequestsRes.data || []);
     setStats({
       total: u.length,
       approved: u.filter((x) => x.account_status === "approved").length,
       pending: u.filter((x) => x.account_status === "pending").length,
       posts: postsRes.data?.length || 0,
       recipes: recipesRes.data?.length || 0,
+      subRequests: (subRequestsRes.data || []).filter((r: any) => r.status === 'pending').length,
     });
     setLoading(false);
   };
@@ -96,6 +100,49 @@ const Admin = () => {
     setActionLoading(null);
   };
 
+  const handleSubscriptionRequest = async (requestId: string, userId: string, planId: string, status: 'approved' | 'rejected') => {
+    setActionLoading(requestId);
+    
+    // 1. Update request status
+    const { error: reqError } = await (supabase as any)
+      .from("subscription_requests")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", requestId);
+
+    if (reqError) {
+      toast({ title: "Erro", description: reqError.message, variant: "destructive" });
+    } else if (status === 'approved') {
+      // 2. Update actual subscription
+      const { data: existing } = await supabase.from("subscriptions").select("id").eq("user_id", userId).single();
+      
+      let subError;
+      if (existing) {
+        const { error } = await supabase.from("subscriptions").update({ 
+          plan: planId as any, 
+          started_at: new Date().toISOString() 
+        }).eq("user_id", userId);
+        subError = error;
+      } else {
+        const { error } = await supabase.from("subscriptions").insert({ 
+          user_id: userId, 
+          plan: planId as any 
+        });
+        subError = error;
+      }
+
+      if (subError) {
+        toast({ title: "Erro na subscrição", description: subError.message, variant: "destructive" });
+      } else {
+        toast({ title: "Sucesso", description: `Plano ${planId.toUpperCase()} activado para o utilizador.` });
+        fetchData();
+      }
+    } else {
+      toast({ title: "Sucesso", description: "Pedido de subscrição rejeitado." });
+      fetchData();
+    }
+    setActionLoading(null);
+  };
+
   const statusBadge = (s: string) => {
     if (s === "approved") return <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Aprovado</Badge>;
     if (s === "pending") return <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">Pendente</Badge>;
@@ -128,6 +175,7 @@ const Admin = () => {
             { label: "Pendentes", value: stats.pending, icon: XCircle },
             { label: "Posts", value: stats.posts, icon: FileText },
             { label: "Receitas", value: stats.recipes, icon: BookOpen },
+            { label: "Aprovações Plano", value: stats.subRequests, icon: CreditCard },
           ].map((s) => (
             <div key={s.label} className="bg-card rounded-xl border border-border p-4 shadow-card">
               <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
@@ -144,6 +192,14 @@ const Admin = () => {
             <TabsTrigger value="users">Utilizadores</TabsTrigger>
             <TabsTrigger value="posts">Posts</TabsTrigger>
             <TabsTrigger value="recipes">Receitas</TabsTrigger>
+            <TabsTrigger value="subscriptions" className="relative">
+              Subscrições
+              {stats.subRequests > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground animate-pulse font-bold">
+                  {stats.subRequests}
+                </span>
+              )}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
@@ -262,6 +318,72 @@ const Admin = () => {
                   {recipes.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center text-muted-foreground py-8">Nenhuma receita encontrada.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="subscriptions">
+            <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Utilizador</TableHead>
+                    <TableHead>Plano Pedido</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {subscriptionRequests.map((req) => (
+                    <TableRow key={req.id}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium text-foreground">{req.profiles?.name || "—"}</p>
+                          <p className="text-xs text-muted-foreground">{req.profiles?.email}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="uppercase font-bold text-[10px] tracking-widest border-primary/30 text-primary bg-primary/5">
+                          {req.plan_id}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {new Date(req.created_at).toLocaleDateString("pt-PT")}
+                      </TableCell>
+                      <TableCell>
+                        {req.status === 'pending' ? (
+                          <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">Pendente</Badge>
+                        ) : req.status === 'approved' ? (
+                          <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-500/20">Aprovado</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="bg-red-500/10 text-red-600 border-red-500/20">Rejeitado</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {req.status === 'pending' && (
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" variant="ghost" className="hover:bg-green-50" 
+                              onClick={() => handleSubscriptionRequest(req.id, req.user_id, req.plan_id, 'approved')} 
+                              disabled={actionLoading === req.id}>
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="hover:bg-red-50" 
+                              onClick={() => handleSubscriptionRequest(req.id, req.user_id, req.plan_id, 'rejected')} 
+                              disabled={actionLoading === req.id}>
+                              <XCircle className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {subscriptionRequests.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Nenhum pedido de subscrição.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>

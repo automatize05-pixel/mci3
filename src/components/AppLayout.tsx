@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { Home, PlusCircle, BookOpen, Sparkles, MessageSquare, User, LogOut, Search, ChefHat, Menu, X, Settings, Bell, Bookmark, PlaySquare } from "lucide-react";
+import { Home, PlusCircle, BookOpen, Sparkles, MessageSquare, User, LogOut, Search, ChefHat, Menu, X, Settings, Bell, Bookmark, PlaySquare, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logoMci from "@/assets/logo-mci.png";
 
@@ -12,6 +12,7 @@ interface AppLayoutProps {
 const mainNav = [
   { href: "/feed", icon: Home, label: "Início" },
   { href: "/recipes", icon: BookOpen, label: "Receitas" },
+  { href: "/communities", icon: Users, label: "Comunidades" },
   { href: "/ai-recipes", icon: Sparkles, label: "IA Chef" },
   { href: "/messages", icon: MessageSquare, label: "Mensagens" },
   { href: "/keels", icon: PlaySquare, label: "Keels" },
@@ -27,11 +28,10 @@ const secondaryNav = [
 
 const mobileBottomNav = [
   { href: "/feed", icon: Home, label: "Início" },
-  { href: "/recipes", icon: BookOpen, label: "Receitas" },
+  { href: "/communities", icon: Users, label: "Comunidades" },
   { href: "/create-post", icon: PlusCircle, label: "Publicar" },
   { href: "/ai-recipes", icon: Sparkles, label: "IA" },
   { href: "/messages", icon: MessageSquare, label: "Chat" },
-  { href: "/keels", icon: PlaySquare, label: "Keels" },
 ];
 
 const AppLayout = ({ children }: AppLayoutProps) => {

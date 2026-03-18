@@ -79,7 +79,7 @@ const Feed = () => {
     setLoading(true);
     const { data, error } = await (supabase as any)
       .from("posts")
-      .select("*, profiles(name, username, profile_picture, account_type)")
+      .select("*, profiles(name, username, profile_picture, account_type), communities(id, title)")
       .order("created_at", { ascending: false })
       .limit(50);
     
@@ -394,6 +394,11 @@ const Feed = () => {
                         <p className="text-xs text-muted-foreground">
                           @{(post.profiles as any)?.username || "—"} · {timeAgo(post.created_at)}
                         </p>
+                        {(post as any).communities && (
+                          <Link to={`/community/${(post as any).communities.id}`} className="inline-flex items-center gap-1.5 px-2 py-0.5 mt-1 rounded-full bg-secondary/20 text-secondary text-[10px] font-bold hover:bg-secondary/30 transition-colors">
+                            <Users className="h-3 w-3" /> {(post as any).communities.title}
+                          </Link>
+                        )}
                       </div>
                       {(post.user_id === currentUserId || adminIds.has(currentUserId || "")) && (
                         <DropdownMenu>

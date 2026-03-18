@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,8 @@ type Message = {
 
 const Messages = () => {
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const targetUserId = searchParams.get("userId");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Profile[]>([]);
   const [allUsers, setAllUsers] = useState<Profile[]>([]);
@@ -51,21 +54,43 @@ const Messages = () => {
         .select("sender_id, receiver_id")
         .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
         .order("created_at", { ascending: false });
+      
+      const userIds = new Set<string>();
       if (msgs) {
-        const userIds = new Set<string>();
         msgs.forEach(m => {
           if (m.sender_id !== currentUserId) userIds.add(m.sender_id);
           if (m.receiver_id !== currentUserId) userIds.add(m.receiver_id);
         });
-        if (userIds.size > 0) {
-          const { data: profiles } = await supabase.from("profiles").select("id, name, username, profile_picture").in("id", Array.from(userIds));
-          setConversations(profiles || []);
+      }
+
+      // If we have a targetUserId from query param, add it to the list to ensure we can select it
+      if (targetUserId && targetUserId !== currentUserId) {
+        userIds.add(targetUserId);
+      }
+
+      if (userIds.size > 0) {
+        const { data: profiles } = await supabase.from("profiles").select("id, name, username, profile_picture").in("id", Array.from(userIds));
+        if (profiles) {
+          setConversations(profiles);
+        }
+      }
+
+      // Separate logic to ensure targetUserId is selected even if the profiles fetch above was skipped/empty
+      if (targetUserId) {
+        const { data: targetProfile } = await supabase.from("profiles").select("id, name, username, profile_picture").eq("id", targetUserId).maybeSingle();
+        if (targetProfile) {
+          setSelectedUser(targetProfile);
+          // Also ensure it's in the conversations list if not already there
+          setConversations(prev => {
+            if (prev.find(p => p.id === targetProfile.id)) return prev;
+            return [targetProfile, ...prev];
+          });
         }
       }
       setLoading(false);
     };
     loadConversations();
-  }, [currentUserId]);
+  }, [currentUserId, targetUserId]);
 
   useEffect(() => {
     if (!currentUserId || !selectedUser) return;

@@ -87,12 +87,13 @@ const AIRecipes = () => {
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
 
-  const aiLimit = AI_LIMITS[plan] || 5;
-  const isUnlimited = aiLimit >= 9999;
+  const aiLimit = isAdmin ? 9999 : (AI_LIMITS[plan] || 5);
+  const isUnlimited = isAdmin || aiLimit >= 9999;
   const isLimitReached = !isUnlimited && aiUsage >= aiLimit;
 
   useEffect(() => {
@@ -105,14 +106,21 @@ const AIRecipes = () => {
       if (!user) { setLoadingPlan(false); return; }
       setUserId(user.id);
       const currentMonth = new Date().toISOString().slice(0, 7);
-      const [{ data: subData }, { data: usageData }, { data: convData }] = await Promise.all([
+      const [{ data: subData }, { data: usageData }, { data: convData }, { data: roleData }] = await Promise.all([
         supabase.from("subscriptions").select("plan").eq("user_id", user.id).single(),
         supabase.from("ai_usage_log").select("usage_count").eq("user_id", user.id).eq("month_year", currentMonth).single(),
         supabase.from("ai_conversations").select("*").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(50),
+        supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle(),
       ]);
       setPlan((subData as any)?.plan || "free");
       setAiUsage(usageData?.usage_count || 0);
       setConversations((convData as any[]) || []);
+      
+      // Robust admin check: also check if email contains admin (optional fallback) or if role is exactly 'admin'
+      const adminByRole = !!roleData;
+      const adminByMetadata = user.app_metadata?.role === 'admin' || user.user_metadata?.role === 'admin';
+      setIsAdmin(adminByRole || adminByMetadata);
+      
       setLoadingPlan(false);
     };
     init();
@@ -144,7 +152,7 @@ const AIRecipes = () => {
   };
 
   const incrementUsage = async () => {
-    if (!userId) return;
+    if (!userId || isAdmin) return;
     const currentMonth = new Date().toISOString().slice(0, 7);
     const { data: existing } = await supabase.from("ai_usage_log")
       .select("id, usage_count").eq("user_id", userId).eq("month_year", currentMonth).single();
@@ -249,12 +257,20 @@ const AIRecipes = () => {
           </div>
           <div className="flex items-center gap-2">
             {!loadingPlan && (
-              <div className="text-right">
-                <p className="text-xs font-semibold text-foreground">
-                  {aiUsage}/{isUnlimited ? "∞" : aiLimit}
-                </p>
+              <div className="flex flex-col items-end">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-foreground">Utilização do Plano {PLAN_LABELS[plan] || "Gratuito"} {isAdmin && "(Admin)"}</span>
+                  <span className="text-xs font-bold text-primary ml-2">
+                    {isUnlimited ? "Ilimitado" : `${aiUsage} / ${aiLimit}`}
+                  </span>
+                </div>
                 {!isUnlimited && (
-                  <Progress value={(aiUsage / aiLimit) * 100} className="h-1.5 w-16 mt-0.5" />
+                  <Progress value={(aiUsage / aiLimit) * 100} className="h-2 rounded-full w-32" />
+                )}
+                {isUnlimited && (
+                  <Progress value={0} className="h-2 rounded-full bg-primary/20 overflow-hidden w-32">
+                     <div className="h-full w-full bg-primary animate-pulse opacity-50" />
+                  </Progress>
                 )}
               </div>
             )}

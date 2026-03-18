@@ -22,6 +22,9 @@ import Admin from "./pages/Admin";
 import Analytics from "./pages/Analytics";
 import Keels from "./pages/Keels";
 import PostDetails from "./pages/PostDetails";
+import Communities from "./pages/Communities";
+import CreateCommunity from "./pages/CreateCommunity";
+import CommunityDetails from "./pages/CommunityDetails";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +53,9 @@ const App = () => (
           <Route path="/discover-chefs" element={<AuthGuard><DiscoverChefs /></AuthGuard>} />
           <Route path="/admin" element={<AuthGuard><Admin /></AuthGuard>} />
           <Route path="/analytics" element={<AuthGuard><Analytics /></AuthGuard>} />
+          <Route path="/communities" element={<AuthGuard><Communities /></AuthGuard>} />
+          <Route path="/create-community" element={<AuthGuard><CreateCommunity /></AuthGuard>} />
+          <Route path="/community/:id" element={<AuthGuard><CommunityDetails /></AuthGuard>} />
           <Route path="/keels" element={<AuthGuard><Keels /></AuthGuard>} />
           <Route path="*" element={<NotFound />} />
         </Routes>

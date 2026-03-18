@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { Camera, Loader2, Save, User, Shield, CreditCard, Bell, ChefHat, Check, Lock, Sparkles, BarChart3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 type SettingsTab = "perfil" | "seguranca" | "assinaturas" | "notificacoes";
 
@@ -30,6 +30,7 @@ const plans = [
 
 const Settings = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<SettingsTab>("perfil");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -110,7 +111,18 @@ const Settings = () => {
   };
 
   const handleChangePlan = async (planId: string) => {
-    if (planId === currentPlan) return;
+    console.log("handleChangePlan called with:", planId, "Current plan:", currentPlan);
+    if (planId === currentPlan) {
+      console.log("Plane is same as current, returning.");
+      return;
+    }
+    
+    if (planId !== "free") {
+      console.log("Redirecting to checkout for plan:", planId);
+      navigate(`/checkout?plan=${planId}`);
+      return;
+    }
+
     setChangingPlan(planId);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;

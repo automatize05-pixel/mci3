@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,20 @@ const CreatePost = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [communities, setCommunities] = useState<any[]>([]);
+  const [selectedCommunity, setSelectedCommunity] = useState<string>("");
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchUserComms = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await (supabase as any).from("communities").select("id, title").eq("owner_id", user.id);
+      if (data) setCommunities(data);
+    };
+    fetchUserComms();
+  }, []);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -65,6 +77,7 @@ const CreatePost = () => {
         title: title.trim(),
         description: description.trim() || null,
         image_url: imageUrl,
+        community_id: selectedCommunity || null,
       });
 
       if (error) throw error;
@@ -113,6 +126,23 @@ const CreatePost = () => {
               rows={4}
             />
           </div>
+
+          {communities.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="community">Publicar em Comunidade (Opcional)</Label>
+              <select
+                id="community"
+                className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 appearance-none"
+                value={selectedCommunity}
+                onChange={(e) => setSelectedCommunity(e.target.value)}
+              >
+                <option value="">Público (Geral)</option>
+                {communities.map(c => (
+                  <option key={c.id} value={c.id}>{c.title}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Imagem</Label>
