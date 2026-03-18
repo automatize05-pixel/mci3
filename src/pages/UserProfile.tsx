@@ -34,15 +34,23 @@ const UserProfile = () => {
       setLoading(true);
       const [profileRes, postsRes, recipesRes, followersRes, followingRes, roleRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", userId).single(),
-        supabase.from("posts").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+        supabase.from("posts")
+          .select("*, likes_count:likes(count)")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false }),
         supabase.from("recipes").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
         supabase.from("followers").select("*", { count: "exact", head: true }).eq("following_id", userId),
         supabase.from("followers").select("*", { count: "exact", head: true }).eq("follower_id", userId),
         supabase.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle(),
       ]);
 
-      setProfile(profileRes.data);
-      setPosts(postsRes.data || []);
+      // Process posts to have a flat likes_count
+      const processedPosts = (postsRes.data || []).map((post: any) => ({
+        ...post,
+        likes_count: post.likes_count?.[0]?.count || 0
+      }));
+      
+      setPosts(processedPosts);
       setRecipes(recipesRes.data || []);
       setFollowersCount(followersRes.count || 0);
       setFollowingCount(followingRes.count || 0);
@@ -204,20 +212,21 @@ const UserProfile = () => {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {posts.map(post => (
-                  <div key={post.id} className="aspect-square bg-card rounded-xl border border-border overflow-hidden relative group cursor-pointer">
+                  <Link key={post.id} to={`/post/${post.id}`} className="aspect-square bg-card rounded-xl border border-border overflow-hidden relative group cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]">
                     {post.image_url ? (
                       <img src={post.image_url} alt={post.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full gradient-warm flex items-center justify-center p-3">
-                        <p className="text-primary-foreground text-xs font-medium text-center line-clamp-3">{post.title}</p>
+                        <p className="text-primary-foreground text-xs font-bold text-center line-clamp-3">{post.title}</p>
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                      <div className="flex items-center gap-3 text-primary-foreground text-sm font-semibold">
-                        <span className="flex items-center gap-1"><Heart className="h-4 w-4" /> {post.likes_count}</span>
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <div className="flex items-center gap-2 text-white font-bold drop-shadow-md">
+                        <Heart className="h-5 w-5 fill-white" />
+                        <span className="text-lg">{post.likes_count}</span>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
