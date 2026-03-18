@@ -4,13 +4,14 @@ import AppLayout from "@/components/AppLayout";
 import UserAvatar from "@/components/Avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, Send, MoreHorizontal, Pencil, Trash2, Reply, Share2, Loader2, ArrowLeft, ChevronRight } from "lucide-react";
+import { Heart, MessageCircle, Send, MoreHorizontal, Pencil, Trash2, Reply, Share2, Loader2, ArrowLeft, ChevronRight, Volume2, Pause, Play, Square } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { awardXP, XP_AMOUNTS } from "@/utils/gamification";
 
 type Post = {
   id: string;
@@ -60,6 +61,8 @@ const PostDetails = () => {
   const [editingComment, setEditingComment] = useState<string | null>(null);
   const [editCommentText, setEditCommentText] = useState("");
   const [adminIds, setAdminIds] = useState<Set<string>>(new Set());
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -82,6 +85,12 @@ const PostDetails = () => {
       if (user) setCurrentUserId(user.id);
     });
     fetchAdmins();
+
+    return () => {
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
   }, []);
 
   const fetchPost = async () => {
@@ -159,6 +168,7 @@ const PostDetails = () => {
       await (supabase as any).from("likes").insert({ user_id: currentUserId, post_id: post.id });
       setLikedPosts(new Set([post.id]));
       setPost(prev => prev ? { ...prev, likes_count: prev.likes_count + 1 } : null);
+      await awardXP(currentUserId, XP_AMOUNTS.LIKE_POST);
     }
   };
 
@@ -191,6 +201,7 @@ const PostDetails = () => {
     setCommentText("");
     setReplyTo(null);
     toast({ title: "Comentário enviado!" });
+    await awardXP(currentUserId, XP_AMOUNTS.COMMENT);
   };
 
   const deleteComment = async (commentId: string) => {
@@ -248,6 +259,42 @@ const PostDetails = () => {
     if (diff < 3600) return `${Math.floor(diff / 60)}m`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
     return `${Math.floor(diff / 86400)}d`;
+  };
+
+  const handleSpeech = () => {
+    if (!("speechSynthesis" in window)) {
+      toast({ title: "Erro", description: "O seu navegador não suporta leitura em voz alta.", variant: "destructive" });
+      return;
+    }
+
+    if (isSpeaking) {
+      if (isPaused) {
+        window.speechSynthesis.resume();
+        setIsPaused(false);
+      } else {
+        window.speechSynthesis.pause();
+        setIsPaused(true);
+      }
+      return;
+    }
+
+    const textToRead = `${post?.title}. ${post?.description || ""}`;
+    const utterance = new SpeechSynthesisUtterance(textToRead);
+    utterance.lang = "pt-PT";
+    
+    utterance.onstart = () => { setIsSpeaking(true); setIsPaused(false); };
+    utterance.onend = () => { setIsSpeaking(false); setIsPaused(false); };
+    utterance.onerror = () => { setIsSpeaking(false); setIsPaused(false); };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const stopSpeech = () => {
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
+    setIsPaused(false);
   };
 
   const renderComments = (parentId: string | null = null, depth = 0) => {
@@ -367,7 +414,27 @@ const PostDetails = () => {
 
           <div className="px-4 pb-4">
             <h1 className="text-2xl font-black font-display text-foreground leading-tight mb-2">{post.title}</h1>
-            {post.description && <p className="text-base text-muted-foreground leading-relaxed italic border-l-4 border-muted pl-4 py-1">{post.description}</p>}
+            {post.description && <p className="text-base text-muted-foreground leading-relaxed italic border-l-4 border-muted pl-4 py-1 whitespace-pre-line">{post.description}</p>}
+            
+            <div className="mt-6 flex items-center gap-2">
+              <Button 
+                variant={isSpeaking ? "default" : "secondary"} 
+                className={`rounded-2xl gap-2 font-bold transition-all ${isSpeaking && !isPaused ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30' : ''}`}
+                onClick={handleSpeech}
+              >
+                {isSpeaking ? (
+                  isPaused ? <><Play className="h-4 w-4" /> Retomar Leitura</> : <><Pause className="h-4 w-4" /> Pausar Leitura</>
+                ) : (
+                  <><Volume2 className="h-4 w-4" /> Cozinhar Mãos-Livres</>
+                )}
+              </Button>
+
+              {isSpeaking && (
+                <Button variant="outline" size="icon" className="rounded-2xl border-destructive/20 text-destructive hover:bg-destructive/10" onClick={stopSpeech}>
+                  <Square className="h-4 w-4 fill-destructive" />
+                </Button>
+              )}
+            </div>
           </div>
 
           {post.image_url && (

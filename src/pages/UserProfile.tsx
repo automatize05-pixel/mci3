@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChefHat, Users, BookOpen, Heart, Loader2, MessageSquare, UserPlus, UserMinus, Share2, TrendingUp, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { BADGES } from "@/utils/gamification";
 
 const UserProfile = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -23,6 +24,8 @@ const UserProfile = () => {
   const [userCommunities, setUserCommunities] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userBadges, setUserBadges] = useState<string[]>([]);
+  const [userXP, setUserXP] = useState(0);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -34,7 +37,7 @@ const UserProfile = () => {
     if (!userId) return;
     const load = async () => {
       setLoading(true);
-      const [profileRes, postsRes, recipesRes, followersRes, followingRes, roleRes, commRes, viewerRoleRes] = await Promise.all([
+      const [profileRes, postsRes, recipesRes, followersRes, followingRes, roleRes, commRes, viewerRoleRes, badgesRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", userId).single(),
         supabase.from("posts")
           .select("*, likes_count:likes(count)")
@@ -46,6 +49,7 @@ const UserProfile = () => {
         supabase.from("profiles").select("id").eq("email", "ageusilva905@gmail.com").eq("id", userId).maybeSingle(),
         (supabase as any).from("communities").select("*").eq("owner_id", userId),
         currentUserId ? supabase.from("profiles").select("id").eq("email", "ageusilva905@gmail.com").eq("id", currentUserId).maybeSingle() : Promise.resolve({ data: null }),
+        (supabase as any).from("user_badges").select("badge_type").eq("user_id", userId),
       ]) as any[];
 
       // Final fallback for isAdmin check if email query blocked by RLS
@@ -66,6 +70,8 @@ const UserProfile = () => {
       setIsAdmin(isTargetAdmin);
       setUserCommunities(commRes.data || []);
       setIsViewerAdmin(isCurAdmin);
+      setUserBadges(badgesRes?.data?.map((b: any) => b.badge_type) || []);
+      setUserXP((profileRes.data as any)?.xp || 0);
 
       // Total likes on user's posts
       if (postsRes.data && postsRes.data.length > 0) {
@@ -207,6 +213,19 @@ const UserProfile = () => {
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Engagement</p>
               </div>
             </div>
+
+            {/* Badge display */}
+            {userBadges.length > 0 && (
+              <div className="mt-4 flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider mr-1">Emblemas:</span>
+                {BADGES.filter(b => userBadges.includes(b.id)).map(badge => (
+                  <span key={badge.id} title={`${badge.name}: ${badge.description}`} className="text-2xl drop-shadow cursor-pointer" role="img" aria-label={badge.name}>
+                    {badge.icon}
+                  </span>
+                ))}
+                <span className="ml-auto text-sm font-black text-primary bg-primary/10 px-2 py-0.5 rounded-lg">{userXP} XP</span>
+              </div>
+            )}
           </div>
         </div>
 

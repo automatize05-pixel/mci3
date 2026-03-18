@@ -39,11 +39,19 @@ const Register = () => {
 
       if (error) throw error;
 
-      toast({
-        title: "Conta criada com sucesso!",
-        description: "Verifique o seu email para confirmar a conta. Após confirmação, a sua conta será analisada pelo administrador.",
-      });
-      navigate("/login");
+      if (accountType === "chef") {
+        toast({
+          title: "Conta de Chef em processo",
+          description: "Por favor, escolha um plano e aguarde aprovação da gerência.",
+        });
+        navigate("/checkout");
+      } else {
+        toast({
+          title: "Conta criada com sucesso!",
+          description: "Verifique o seu email e faça login para entrar na comunidade.",
+        });
+        navigate("/login");
+      }
     } catch (error: any) {
       toast({
         title: "Erro ao criar conta",

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Shield, Users, FileText, BookOpen, MessageSquare, CheckCircle, XCircle, Ban, Trash2, Loader2, CreditCard } from "lucide-react";
+import { Shield, ShieldCheck, Users, FileText, BookOpen, MessageSquare, CheckCircle, XCircle, Ban, Trash2, Loader2, CreditCard } from "lucide-react";
 
 type Profile = {
   id: string;
@@ -43,32 +43,8 @@ const Admin = () => {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [stats, setStats] = useState({ total: 0, approved: 0, pending: 0, posts: 0, recipes: 0, subRequests: 0 });
 
-  const fetchData = async () => {
-    setLoading(true);
-    const [usersRes, postsRes, recipesRes, subRequestsRes] = await Promise.all([
-      supabase.from("profiles").select("*").order("created_at", { ascending: false }),
-      supabase.from("posts").select("*, profiles(name, username)").order("created_at", { ascending: false }).limit(50),
-      supabase.from("recipes").select("*, profiles(name, username)").order("created_at", { ascending: false }).limit(50),
-      (supabase as any).from("subscription_requests").select("*, profiles(name, username, email)").order("created_at", { ascending: false }),
-    ]);
-
-    const u = (usersRes.data || []) as Profile[];
-    setUsers(u);
-    setPosts((postsRes.data || []) as any);
-    setRecipes((recipesRes.data || []) as any);
-    setSubscriptionRequests(subRequestsRes.data || []);
-    setStats({
-      total: u.length,
-      approved: u.filter((x) => x.account_status === "approved").length,
-      pending: u.filter((x) => x.account_status === "pending").length,
-      posts: postsRes.data?.length || 0,
-      recipes: recipesRes.data?.length || 0,
-      subRequests: (subRequestsRes.data || []).filter((r: any) => r.status === 'pending').length,
-    });
-    setLoading(false);
-  };
-
   const [dbStatus, setDbStatus] = useState<Record<string, { exists: boolean; error?: string }>>({});
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const checkDatabase = async () => {
     const tables = ['communities', 'community_members', 'subscription_requests'];
@@ -86,33 +62,56 @@ const Admin = () => {
     setDbStatus(status);
   };
 
-  const [fetchError, setFetchError] = useState<string | null>(null);
-
   const fetchData = async () => {
     setLoading(true);
     setFetchError(null);
     try {
-      const [profilesRes, postsRes, recipesRes, requestsRes] = await Promise.all([
+      const [usersRes, postsRes, recipesRes, requestsRes] = await Promise.all([
         supabase.from("profiles").select("*").order("created_at", { ascending: false }),
-        supabase.from("posts").select("*, profiles(name, username, profile_picture)").order("created_at", { ascending: false }),
-        supabase.from("recipes").select("*, profiles(name, username, profile_picture)").order("created_at", { ascending: false }),
+        supabase.from("posts").select("*, profiles(name, username, profile_picture)").order("created_at", { ascending: false }).limit(50),
+        supabase.from("recipes").select("*, profiles(name, username, profile_picture)").order("created_at", { ascending: false }).limit(50),
         (supabase as any).from("subscription_requests").select("*, profiles(name, username, email)").order("created_at", { ascending: false }),
       ]);
 
-      if (profilesRes.data) setProfiles(profilesRes.data);
-      if (postsRes.data) setPosts(postsRes.data as any);
-      if (recipesRes.data) setRecipes(recipesRes.data as any);
+      const u = (usersRes.data || []) as Profile[];
+      setUsers(u);
+      setPosts((postsRes.data || []) as any);
+      setRecipes((recipesRes.data || []) as any);
       
       if (requestsRes.error) {
         console.error("Subscription requests error:", requestsRes.error);
         setFetchError(requestsRes.error.message);
       }
-      if (requestsRes.data) setSubscriptionRequests(requestsRes.data);
+      const reqs = requestsRes.data || [];
+      setSubscriptionRequests(reqs);
+
+      setStats({
+        total: u.length,
+        approved: u.filter((x) => x.account_status === "approved").length,
+        pending: u.filter((x) => x.account_status === "pending").length,
+        posts: postsRes.data?.length || 0,
+        recipes: recipesRes.data?.length || 0,
+        subRequests: reqs.filter((r: any) => r.status === 'pending').length,
+      });
     } catch (err: any) {
       console.error("fetchData error:", err);
       setFetchError(err.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+    checkDatabase();
+  }, []);
+
+  const updateUserStatus = async (userId: string, status: "approved" | "suspended" | "pending") => {
+    setActionLoading(userId);
+    const { error } = await supabase.from("profiles").update({ account_status: status }).eq("id", userId);
+    if (error) toast({ title: "Erro", description: error.message, variant: "destructive" });
+    else { toast({ title: "Estado atualizado" }); fetchData(); }
+    setActionLoading(null);
   };
 
   const deletePost = async (postId: string) => {

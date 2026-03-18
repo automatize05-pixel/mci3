@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { ImagePlus, Loader2, PlusCircle, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { awardXP, XP_AMOUNTS } from "@/utils/gamification";
 
 const CreatePost = () => {
   const [title, setTitle] = useState("");
@@ -83,6 +84,7 @@ const CreatePost = () => {
       if (error) throw error;
 
       toast({ title: "Publicação criada!" });
+      await awardXP(user.id, XP_AMOUNTS.CREATE_POST);
       navigate("/feed");
     } catch (error: any) {
       toast({

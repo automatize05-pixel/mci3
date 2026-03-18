@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Check, CreditCard, ShieldCheck, Zap } from "lucide-react";
+import { Check, CreditCard, ShieldCheck, Zap, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -98,9 +98,16 @@ const Checkout = () => {
         description: "Envia mensagem ao admin para ativar o teu plano manually.",
       });
     } else {
+      if (adminId) {
+        await supabase.from("notifications").insert({
+          user_id: adminId,
+          type: "subscription_request",
+          content: `Novo pedido de subscrição ${plan.id.toUpperCase()} aguarda validação.`,
+        });
+      }
       toast({ 
         title: "Pedido enviado!", 
-        description: "O seu pedido está pendente de aprovação após o pagamento.",
+        description: "O seu pedido está pendente de aprovação após o pagamento. O administrador já foi notificado.",
       });
     }
     

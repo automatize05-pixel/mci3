@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { Home, PlusCircle, BookOpen, Sparkles, MessageSquare, User, LogOut, Search, ChefHat, Menu, X, Settings, Bell, Bookmark, PlaySquare, Users } from "lucide-react";
+import { Home, PlusCircle, BookOpen, Sparkles, MessageSquare, User, LogOut, Search, ChefHat, Menu, X, Settings, Bell, Bookmark, PlaySquare, Users, ShoppingCart, Calendar, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logoMci from "@/assets/logo-mci.png";
 
@@ -20,6 +20,9 @@ const mainNav = [
 ];
 
 const secondaryNav = [
+  { href: "/planner", icon: Calendar, label: "Planeador" },
+  { href: "/shopping-list", icon: ShoppingCart, label: "Lista Compras" },
+  { href: "/masterclasses", icon: GraduationCap, label: "Masterclasses" },
   { href: "/notifications", icon: Bell, label: "Notificações" },
   { href: "/search", icon: Search, label: "Pesquisar" },
   { href: "/profile", icon: User, label: "Perfil" },
@@ -39,6 +42,32 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   const location = useLocation();
   const [mobileMenu, setMobileMenu] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  const playNotificationSound = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(500, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1000, ctx.currentTime + 0.1);
+      
+      gainNode.gain.setValueAtTime(0, ctx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.05);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+
+      osc.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.5);
+    } catch (e) {
+      console.warn("Audio Context blocked:", e);
+    }
+  };
 
   useEffect(() => {
     const initNotifications = async () => {
@@ -67,6 +96,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           },
           () => {
             setUnreadCount(prev => prev + 1);
+            playNotificationSound();
           }
         )
         .subscribe();

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import AppLayout from "@/components/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { Heart, MessageCircle, Share2, Music2, UserPlus, Loader2, PlusCircle } from "lucide-react";
@@ -19,6 +19,90 @@ interface Keel {
     profile_picture: string | null;
   } | null;
 }
+
+const KeelItem = ({ keel, adminIds }: { keel: Keel; adminIds: Set<string> }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isPlaying, setIsPlaying] = useState(true);
+
+  const togglePlay = () => {
+    if (!videoRef.current) return;
+    if (isPlaying) {
+      videoRef.current.pause();
+    } else {
+      videoRef.current.play();
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  return (
+    <div className="h-full w-full snap-start relative bg-black flex items-center justify-center cursor-pointer" onClick={togglePlay}>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="w-full h-full bg-gradient-to-b from-transparent via-transparent to-black/80 absolute z-10" />
+        <video 
+          ref={videoRef}
+          src={keel.video_url} 
+          className="w-full h-full object-cover"
+          loop
+          muted={false}
+          autoPlay
+        />
+      </div>
+      
+      {!isPlaying && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/20">
+          <div className="w-16 h-16 bg-white/30 backdrop-blur-md rounded-full flex items-center justify-center">
+            <svg className="w-8 h-8 text-white fill-current ml-1" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+        </div>
+      )}
+
+      {/* Sidebar Actions */}
+      <div className="absolute right-4 bottom-24 z-20 flex flex-col items-center gap-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-col items-center gap-1 group">
+          <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center cursor-pointer hover:bg-white/20 transition-colors">
+            <Heart className="h-6 w-6 text-white" />
+          </div>
+          <span className="text-white text-xs font-medium">{keel.likes_count || 0}</span>
+        </div>
+        
+        <div className="flex flex-col items-center gap-1">
+          <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center cursor-pointer hover:bg-white/20 transition-colors">
+            <MessageCircle className="h-6 w-6 text-white" />
+          </div>
+          <span className="text-white text-xs font-medium">0</span>
+        </div>
+
+        <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center cursor-pointer hover:bg-white/20 transition-colors">
+          <Share2 className="h-6 w-6 text-white" />
+        </div>
+      </div>
+
+      {/* Info Overlay */}
+      <div className="absolute left-4 bottom-8 right-16 z-20 text-white" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 mb-3">
+          <UserAvatar 
+            src={keel.profiles?.profile_picture} 
+            name={keel.profiles?.name} 
+            username={keel.profiles?.username} 
+            isVerified={adminIds.has(keel.user_id)}
+            size="md" 
+          />
+          <div>
+            <p className="font-bold text-sm shadow-black drop-shadow-md">@{keel.profiles?.username || "usuario"}</p>
+            <p className="text-[10px] opacity-90 flex items-center gap-1 shadow-black drop-shadow-md mt-0.5">
+              <Music2 className="h-3 w-3" /> Som original
+            </p>
+          </div>
+          <Button size="sm" variant="ghost" className="bg-white/20 hover:bg-white/30 text-white text-[10px] h-7 px-3 rounded-lg ml-2 font-bold backdrop-blur-sm">
+            Seguir
+          </Button>
+        </div>
+        <h3 className="font-bold mb-1 shadow-black drop-shadow-md text-base">{keel.title}</h3>
+        <p className="text-sm opacity-90 line-clamp-2 shadow-black drop-shadow-md">{keel.description}</p>
+      </div>
+    </div>
+  );
+};
 
 const Keels = () => {
   const [keels, setKeels] = useState<Keel[]>([]);
@@ -119,64 +203,7 @@ const Keels = () => {
           </div>
         ) : (
           keels.map(keel => (
-            <div key={keel.id} className="h-full w-full snap-start relative bg-black flex items-center justify-center">
-              {/* Video Placeholder (Actual video tag would go here) */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-full h-full bg-gradient-to-b from-transparent to-black/60 absolute z-10" />
-                <video 
-                  src={keel.video_url} 
-                  className="w-full h-full object-cover"
-                  loop
-                  muted
-                  autoPlay
-                />
-              </div>
-
-              {/* Sidebar Actions */}
-              <div className="absolute right-4 bottom-24 z-20 flex flex-col items-center gap-6">
-                <div className="flex flex-col items-center gap-1 group">
-                  <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center cursor-pointer hover:bg-white/20 transition-colors">
-                    <Heart className="h-6 w-6 text-white" />
-                  </div>
-                  <span className="text-white text-xs font-medium">{keel.likes_count}</span>
-                </div>
-                
-                <div className="flex flex-col items-center gap-1">
-                  <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center cursor-pointer hover:bg-white/20 transition-colors">
-                    <MessageCircle className="h-6 w-6 text-white" />
-                  </div>
-                  <span className="text-white text-xs font-medium">0</span>
-                </div>
-
-                <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center cursor-pointer hover:bg-white/20 transition-colors">
-                  <Share2 className="h-6 w-6 text-white" />
-                </div>
-              </div>
-
-              {/* Info Overlay */}
-              <div className="absolute left-4 bottom-8 right-16 z-20 text-white">
-                <div className="flex items-center gap-3 mb-3">
-                  <UserAvatar 
-                    src={keel.profiles?.profile_picture} 
-                    name={keel.profiles?.name} 
-                    username={keel.profiles?.username} 
-                    isVerified={adminIds.has(keel.user_id)}
-                    size="md" 
-                  />
-                  <div>
-                    <p className="font-bold text-sm">@{keel.profiles?.username}</p>
-                    <p className="text-[10px] opacity-80 flex items-center gap-1">
-                      <Music2 className="h-3 w-3" /> Som original
-                    </p>
-                  </div>
-                  <Button size="sm" variant="ghost" className="bg-white/20 hover:bg-white/30 text-white text-[10px] h-7 px-3 rounded-lg ml-2">
-                    Seguir
-                  </Button>
-                </div>
-                <h3 className="font-bold mb-1">{keel.title}</h3>
-                <p className="text-sm opacity-90 line-clamp-2">{keel.description}</p>
-              </div>
-            </div>
+            <KeelItem key={keel.id} keel={keel} adminIds={adminIds} />
           ))
         )}
       </div>

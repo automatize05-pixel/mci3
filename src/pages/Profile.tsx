@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Camera, Loader2, Save, Shield, ChefHat } from "lucide-react";
+import { Camera, Loader2, Save, Shield, ChefHat, Trophy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
+import { BADGES } from "@/utils/gamification";
 
 const Profile = () => {
   const { toast } = useToast();
@@ -23,8 +24,10 @@ const Profile = () => {
     bio: "",
     profile_picture: "",
     account_type: "user",
+    xp: 0,
   });
   const [userId, setUserId] = useState<string | null>(null);
+  const [myBadges, setMyBadges] = useState<string[]>([]);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -32,9 +35,10 @@ const Profile = () => {
       if (!user) return;
       setUserId(user.id);
 
-      const [{ data: profileData }, { data: roleData }] = await Promise.all([
+      const [{ data: profileData }, { data: roleData }, { data: badgesData }] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", user.id).single(),
-        supabase.from("user_roles").select("role").eq("user_id", user.id).single(),
+        supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle(),
+        (supabase as any).from("user_badges").select("badge_type").eq("user_id", user.id),
       ]);
 
       if (profileData) {
@@ -45,9 +49,11 @@ const Profile = () => {
           bio: profileData.bio || "",
           profile_picture: profileData.profile_picture || "",
           account_type: (profileData as any).account_type || "user",
+          xp: (profileData as any).xp || 0,
         });
       }
 
+      setMyBadges(badgesData?.map((b: any) => b.badge_type) || []);
       setIsAdmin(roleData?.role === "admin");
       setLoading(false);
     };
@@ -179,6 +185,31 @@ const Profile = () => {
           <Button onClick={handleSave} variant="hero" size="lg" className="w-full rounded-xl" disabled={saving}>
             {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> A guardar...</> : <><Save className="h-4 w-4" /> Guardar Alterações</>}
           </Button>
+        </div>
+
+        <div className="bg-card rounded-2xl border border-border p-6 shadow-card space-y-4 mt-6">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-primary" />
+              <h3 className="font-bold text-foreground font-display text-lg">Emblemas & Nível</h3>
+            </div>
+            <div className="text-right">
+              <span className="text-xl font-black text-primary bg-primary/10 px-3 py-1 rounded-xl shadow-inner">{profile.xp} XP</span>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-5 gap-2 sm:gap-4 mt-4">
+            {BADGES.map((badge, i) => {
+              const isEarned = myBadges.includes(badge.id);
+              return (
+                <div key={i} className={`flex flex-col items-center justify-center p-2 sm:p-3 rounded-2xl border shadow-sm transition-all ${isEarned ? 'bg-background border-primary/30 shadow-primary/5' : 'bg-muted/50 border-transparent opacity-40 grayscale hover:grayscale-0'}`}>
+                  <span className="text-2xl sm:text-3xl mb-2 drop-shadow-sm">{badge.icon}</span>
+                  <span className="text-[9px] sm:text-[10px] font-bold leading-tight text-center text-foreground">{badge.name}</span>
+                  {!isEarned && <span className="text-[8px] text-muted-foreground mt-1">{badge.xp_required} XP</span>}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </AppLayout>

@@ -30,14 +30,20 @@ const Login = () => {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("account_status")
+        .select("account_status, account_type")
         .eq("id", data.user.id)
         .single();
 
       if (profile?.account_status === "pending") {
-        await supabase.auth.signOut();
-        toast({ title: "Conta pendente", description: "A sua conta está a aguardar aprovação.", variant: "destructive" });
-        return;
+        if (profile?.account_type === "chef") {
+          toast({ title: "Conta restrita", description: "As contas de Chef requerem a seleção e aprovação de um plano." });
+          navigate("/checkout");
+          return;
+        } else {
+          await supabase.auth.signOut();
+          toast({ title: "Conta pendente", description: "A sua conta está a aguardar aprovação.", variant: "destructive" });
+          return;
+        }
       }
 
       if (profile?.account_status === "suspended") {

@@ -26,6 +26,9 @@ import Communities from "./pages/Communities";
 import CreateCommunity from "./pages/CreateCommunity";
 import CommunityDetails from "./pages/CommunityDetails";
 import Checkout from "./pages/Checkout";
+import ShoppingList from "./pages/ShoppingList";
+import MealPlanner from "./pages/MealPlanner";
+import ChefMarketplace from "./pages/ChefMarketplace";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -59,6 +62,9 @@ const App = () => (
           <Route path="/community/:id" element={<AuthGuard><CommunityDetails /></AuthGuard>} />
           <Route path="/keels" element={<AuthGuard><Keels /></AuthGuard>} />
           <Route path="/checkout" element={<AuthGuard><Checkout /></AuthGuard>} />
+          <Route path="/shopping-list" element={<AuthGuard><ShoppingList /></AuthGuard>} />
+          <Route path="/planner" element={<AuthGuard><MealPlanner /></AuthGuard>} />
+          <Route path="/masterclasses" element={<AuthGuard><ChefMarketplace /></AuthGuard>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

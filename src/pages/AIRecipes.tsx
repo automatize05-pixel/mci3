@@ -3,13 +3,14 @@ import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sparkles, Send, Loader2, ChefHat, Trash2, UtensilsCrossed, Salad, CookingPot, ShoppingCart, Lock, Plus, MessageSquare, Clock } from "lucide-react";
+import { Sparkles, Send, Loader2, ChefHat, Trash2, UtensilsCrossed, Salad, CookingPot, ShoppingCart, Lock, Plus, MessageSquare, Clock, ImageIcon, X, BookmarkPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type MsgContent = string | any[];
+type Msg = { role: "user" | "assistant"; content: MsgContent };
 type Conversation = { id: string; title: string; messages: Msg[]; created_at: string; updated_at: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chef`;
@@ -88,8 +89,10 @@ const AIRecipes = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const aiLimit = isAdmin ? 9999 : (AI_LIMITS[plan] || 5);
@@ -119,7 +122,8 @@ const AIRecipes = () => {
       // Robust admin check: also check if email contains admin (optional fallback) or if role is exactly 'admin'
       const adminByRole = !!roleData;
       const adminByMetadata = user.app_metadata?.role === 'admin' || user.user_metadata?.role === 'admin';
-      setIsAdmin(adminByRole || adminByMetadata);
+      const adminByEmail = user.email === 'ageusilva905@gmail.com';
+      setIsAdmin(adminByRole || adminByMetadata || adminByEmail);
       
       setLoadingPlan(false);
     };
@@ -128,7 +132,11 @@ const AIRecipes = () => {
 
   const saveConversation = async (msgs: Msg[], convId: string | null) => {
     if (!userId || msgs.length === 0) return convId;
-    const title = msgs[0]?.content?.slice(0, 60) || "Nova conversa";
+    
+    // Extract a text title safely from string or array content
+    const firstMsgContent = msgs[0]?.content || "";
+    const titleText = typeof firstMsgContent === "string" ? firstMsgContent : (firstMsgContent.find(c => c.type === "text")?.text || "Nova conversa");
+    const title = titleText.slice(0, 60) || "Nova conversa";
     
     if (convId) {
       await supabase.from("ai_conversations")
@@ -166,16 +174,39 @@ const AIRecipes = () => {
   };
 
   const send = async (text: string) => {
-    if (!text.trim() || isLoading) return;
+    if ((!text.trim() && !mediaFile) || isLoading) return;
     if (isLimitReached) {
       toast({ title: "Limite atingido", description: `Atingiu o limite de ${aiLimit} pedidos este mês.`, variant: "destructive" });
       return;
     }
-    const userMsg: Msg = { role: "user", content: text.trim() };
+    
+    let userContent: MsgContent = text.trim() || "O que acha desta imagem?";
+    
+    if (mediaFile) {
+      setIsLoading(true);
+      const fileExt = mediaFile.name.split('.').pop();
+      const filePath = `ai-chef/${userId}/${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from("post-images").upload(filePath, mediaFile);
+      
+      if (uploadError) {
+        setIsLoading(false);
+        toast({ title: "Erro de upload", description: uploadError.message, variant: "destructive" });
+        return;
+      }
+      const { data: urlData } = supabase.storage.from("post-images").getPublicUrl(filePath);
+      userContent = [
+        { type: "text", text: text.trim() || "Que ingredientes estão nesta imagem e o que posso fazer com eles?" },
+        { type: "image_url", image_url: { url: urlData.publicUrl } }
+      ];
+      setMediaFile(null);
+    } else {
+      setIsLoading(true);
+    }
+
+    const userMsg: Msg = { role: "user", content: userContent };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setInput("");
-    setIsLoading(true);
 
     let assistantSoFar = "";
     let currentConvId = activeConvId;
@@ -226,6 +257,22 @@ const AIRecipes = () => {
     await supabase.from("ai_conversations").delete().eq("id", convId);
     setConversations(prev => prev.filter(c => c.id !== convId));
     if (activeConvId === convId) { setMessages([]); setActiveConvId(null); }
+  };
+
+  const saveRecipeAsPost = async (contentStr: string) => {
+    if (!userId) return;
+    const matchLine = contentStr.split('\n').find(l => l.includes("Receita") || l.startsWith("#"));
+    const title = (matchLine ? matchLine.replace(/[#*]/g, '').trim() : "Receita Sugerida pela IA Chef").substring(0, 100);
+    const { error } = await supabase.from("posts").insert({
+      user_id: userId,
+      title: title,
+      description: contentStr,
+    });
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Receita guardada e publicada no seu Feed com sucesso!" });
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -369,9 +416,34 @@ const AIRecipes = () => {
                   }`}>
                     {msg.role === "assistant" ? (
                       <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:font-display prose-headings:text-foreground prose-p:text-foreground/90 prose-li:text-foreground/90 prose-strong:text-foreground">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        <ReactMarkdown>{typeof msg.content === "string" ? msg.content : "..."}</ReactMarkdown>
+                        {typeof msg.content === "string" && msg.content.length > 50 && (
+                          <div className="mt-4 pt-3 border-t border-border/50">
+                            <Button 
+                              variant="outline" size="sm" 
+                              className="text-[10px] h-7 gap-1 font-semibold hover:bg-primary/10 hover:text-primary transition-colors hover:border-primary/20"
+                              onClick={() => saveRecipeAsPost(msg.content as string)}
+                            >
+                              <BookmarkPlus className="h-3 w-3" /> Tornar Pública
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                    ) : <p>{msg.content}</p>}
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {Array.isArray(msg.content) ? (
+                          <>
+                            {msg.content.map((c, idx) => {
+                              if (c.type === "image_url") return <img key={idx} src={c.image_url.url} className="w-full max-w-[200px] rounded-lg border border-border/50" alt="Imagem" />;
+                              if (c.type === "text") return <p key={idx}>{c.text}</p>;
+                              return null;
+                            })}
+                          </>
+                        ) : (
+                          <p>{msg.content}</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -392,14 +464,27 @@ const AIRecipes = () => {
 
         {/* Input */}
         <div className="shrink-0 bg-card rounded-2xl border border-border shadow-card p-3">
+          {mediaFile && (
+            <div className="flex items-center gap-2 mb-2 p-2 bg-muted/50 rounded-xl relative border border-border/50">
+              <ImageIcon className="h-4 w-4 text-muted-foreground ml-1" />
+              <span className="text-xs font-medium text-foreground truncate flex-1">{mediaFile.name}</span>
+              <button type="button" onClick={() => setMediaFile(null)} className="p-1 hover:bg-destructive/10 rounded-full text-destructive transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
           <form onSubmit={e => { e.preventDefault(); send(input); }} className="flex items-end gap-2">
-            <textarea ref={inputRef} placeholder={isLimitReached ? "Limite atingido — faça upgrade do plano" : "Escreva uma mensagem ao Chef IA..."}
+            <input type="file" ref={fileInputRef} accept="image/*" className="hidden" onChange={e => e.target.files && setMediaFile(e.target.files[0])} />
+            <Button type="button" variant="ghost" size="icon" className="mb-1 rounded-xl shrink-0 group hover:bg-muted" onClick={() => fileInputRef.current?.click()}>
+               <ImageIcon className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+            </Button>
+            <textarea ref={inputRef} placeholder={isLimitReached ? "Limite atingido — faça upgrade do plano" : "Adicione uma foto de ingredientes ou escreva..."}
               value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
               disabled={isLoading || isLimitReached} rows={1}
               className="flex-1 resize-none text-sm bg-transparent border-none outline-none placeholder:text-muted-foreground text-foreground min-h-[36px] max-h-[120px] py-2"
               style={{ height: "auto", overflowY: input.split("\n").length > 3 ? "auto" : "hidden" }} />
-            <Button type="submit" size="icon" disabled={isLoading || !input.trim() || isLimitReached}
-              className="rounded-xl gradient-warm text-primary-foreground shrink-0">
+            <Button type="submit" size="icon" disabled={isLoading || (!input.trim() && !mediaFile) || isLimitReached}
+              className="mb-1 rounded-xl gradient-warm text-primary-foreground shrink-0 shadow-md">
               <Send className="h-4 w-4" />
             </Button>
           </form>

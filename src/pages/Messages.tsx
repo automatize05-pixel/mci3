@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageSquare, Send, Search, ArrowLeft, Loader2, Paperclip, Smile } from "lucide-react";
+import { MessageSquare, Send, Search, ArrowLeft, Loader2, Paperclip, Smile, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type Profile = {
@@ -37,6 +37,8 @@ const Messages = () => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -134,18 +136,52 @@ const Messages = () => {
   }, [search, currentUserId]);
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !currentUserId || !selectedUser) return;
+    if ((!newMessage.trim() && !mediaFile) || !currentUserId || !selectedUser) return;
     setSending(true);
-    const { error } = await supabase.from("messages").insert({ sender_id: currentUserId, receiver_id: selectedUser.id, message: newMessage.trim() });
+
+    let finalMessage = newMessage.trim();
+
+    if (mediaFile) {
+      const ext = mediaFile.name.split(".").pop();
+      const path = `chat/${currentUserId}/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("post-images")
+        .upload(path, mediaFile);
+
+      if (uploadError) {
+        toast({ title: "Erro no upload", description: uploadError.message, variant: "destructive" });
+        setSending(false);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage.from("post-images").getPublicUrl(path);
+      const fileType = mediaFile.type.startsWith("image/") ? "IMAGE:" : "AUDIO:";
+      finalMessage = `${fileType}${urlData.publicUrl}`;
+    }
+
+    const { error } = await supabase.from("messages").insert({ sender_id: currentUserId, receiver_id: selectedUser.id, message: finalMessage });
     if (error) toast({ title: "Erro ao enviar", description: error.message, variant: "destructive" });
     else {
       setNewMessage("");
+      setMediaFile(null);
       if (!conversations.find(c => c.id === selectedUser.id)) setConversations(prev => [selectedUser, ...prev]);
     }
     setSending(false);
   };
 
-  const selectUser = (user: Profile) => { setSelectedUser(user); setShowSearch(false); setSearch(""); setAllUsers([]); };
+  const selectUser = (user: Profile) => { 
+    setSelectedUser(user); setShowSearch(false); setSearch(""); setAllUsers([]); setMediaFile(null); setNewMessage("");
+  };
+
+  const renderMessageContent = (text: string) => {
+    if (text.startsWith("IMAGE:")) {
+      return <img src={text.substring(6)} alt="Imagem enviada" className="max-w-[200px] h-auto rounded-lg mt-1" />;
+    }
+    if (text.startsWith("AUDIO:")) {
+      return <audio controls src={text.substring(6)} className="w-[200px] md:w-[250px] mt-1 h-10" />;
+    }
+    return <p>{text}</p>;
+  };
 
   const formatTime = (d: string) => {
     const date = new Date(d);
@@ -284,9 +320,9 @@ const Messages = () => {
                                     ? "gradient-warm text-primary-foreground rounded-2xl rounded-br-md"
                                     : "bg-muted text-foreground rounded-2xl rounded-bl-md"
                                 }`}
-                              >
-                                <p>{msg.message}</p>
-                                <p className={`text-[10px] mt-1 text-right ${isMine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                                >
+                                  {renderMessageContent(msg.message)}
+                                  <p className={`text-[10px] mt-1 text-right ${isMine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
                                   {formatTime(msg.created_at)}
                                 </p>
                               </div>
@@ -300,8 +336,18 @@ const Messages = () => {
                 </ScrollArea>
 
                 <div className="p-4 border-t border-border bg-card">
+                  {mediaFile && (
+                    <div className="flex items-center gap-2 mb-3 bg-muted/50 p-2 rounded-xl text-xs">
+                      {mediaFile.type.startsWith("image/") ? <Paperclip className="h-4 w-4" /> : <Loader2 className="h-4 w-4" />}
+                      <span className="flex-1 truncate">{mediaFile.name}</span>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full" onClick={() => setMediaFile(null)}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
                   <form onSubmit={e => { e.preventDefault(); sendMessage(); }} className="flex items-center gap-2">
-                    <Button type="button" variant="ghost" size="icon" className="rounded-xl text-muted-foreground shrink-0">
+                    <input type="file" ref={fileInputRef} accept="image/*, audio/*" className="hidden" onChange={e => e.target.files && setMediaFile(e.target.files[0])} />
+                    <Button type="button" variant="ghost" size="icon" className="rounded-xl text-muted-foreground shrink-0" onClick={() => fileInputRef.current?.click()}>
                       <Paperclip className="h-4 w-4" />
                     </Button>
                     <Input
@@ -314,8 +360,8 @@ const Messages = () => {
                     <Button type="button" variant="ghost" size="icon" className="rounded-xl text-muted-foreground shrink-0">
                       <Smile className="h-4 w-4" />
                     </Button>
-                    <Button type="submit" size="icon" disabled={sending || !newMessage.trim()} className="rounded-xl gradient-warm text-primary-foreground shrink-0">
-                      <Send className="h-4 w-4" />
+                    <Button type="submit" size="icon" disabled={sending || (!newMessage.trim() && !mediaFile)} className="rounded-xl gradient-warm text-primary-foreground shrink-0">
+                      {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     </Button>
                   </form>
                 </div>
