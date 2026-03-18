@@ -50,6 +50,7 @@ const UserProfile = () => {
         likes_count: post.likes_count?.[0]?.count || 0
       }));
       
+      setProfile(profileRes.data);
       setPosts(processedPosts);
       setRecipes(recipesRes.data || []);
       setFollowersCount(followersRes.count || 0);
