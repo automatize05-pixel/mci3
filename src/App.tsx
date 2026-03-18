@@ -21,6 +21,7 @@ import DiscoverChefs from "./pages/DiscoverChefs";
 import Admin from "./pages/Admin";
 import Analytics from "./pages/Analytics";
 import Keels from "./pages/Keels";
+import PostDetails from "./pages/PostDetails";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/feed" element={<AuthGuard><Feed /></AuthGuard>} />
+          <Route path="/post/:postId" element={<AuthGuard><PostDetails /></AuthGuard>} />
           <Route path="/create-post" element={<AuthGuard><CreatePost /></AuthGuard>} />
           <Route path="/recipes" element={<AuthGuard><Recipes /></AuthGuard>} />
           <Route path="/ai-recipes" element={<AuthGuard><AIRecipes /></AuthGuard>} />

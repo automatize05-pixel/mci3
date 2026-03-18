@@ -8,6 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Heart, MessageCircle, PlusCircle, Loader2, Send, MoreHorizontal, Pencil, Trash2, Reply, Share2, Trophy, Sparkles, TrendingUp, Bookmark } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 type Post = {
   id: string;
@@ -221,6 +225,32 @@ const Feed = () => {
     }));
   };
 
+  const [editingPost, setEditingPost] = useState<Post | null>(null);
+  const [editPostTitle, setEditPostTitle] = useState("");
+  const [editPostDesc, setEditPostDesc] = useState("");
+  const [isDeletingPost, setIsDeletingPost] = useState<string | null>(null);
+
+  const deletePost = async (postId: string) => {
+    const { error } = await (supabase as any).from("posts").delete().eq("id", postId);
+    if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
+    setPosts(prev => prev.filter(p => p.id !== postId));
+    toast({ title: "Publicação eliminada." });
+  };
+
+  const updatePost = async () => {
+    if (!editingPost || !editPostTitle.trim()) return;
+    const { error } = await (supabase as any)
+      .from("posts")
+      .update({ title: editPostTitle.trim(), description: editPostDesc.trim() || null })
+      .eq("id", editingPost.id);
+
+    if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
+    
+    setPosts(prev => prev.map(p => p.id === editingPost.id ? { ...p, title: editPostTitle.trim(), description: editPostDesc.trim() || null } : p));
+    setEditingPost(null);
+    toast({ title: "Publicação atualizada!" });
+  };
+
   const updateComment = async (postId: string, commentId: string) => {
     if (!editText.trim()) return;
     const { error } = await (supabase as any).from("comments").update({ content: editText.trim() }).eq("id", commentId);
@@ -365,15 +395,38 @@ const Feed = () => {
                           @{(post.profiles as any)?.username || "—"} · {timeAgo(post.created_at)}
                         </p>
                       </div>
+                      {(post.user_id === currentUserId || adminIds.has(currentUserId || "")) && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {post.user_id === currentUserId && (
+                              <DropdownMenuItem onClick={() => { setEditingPost(post); setEditPostTitle(post.title); setEditPostDesc(post.description || ""); }}>
+                                <Pencil className="h-3.5 w-3.5 mr-2" /> Editar Post
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onClick={() => { if(confirm("Deseja eliminar este post?")) deletePost(post.id) }} className="text-destructive font-medium">
+                              <Trash2 className="h-3.5 w-3.5 mr-2" /> Eliminar Post
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
 
                     <div className="px-4 pb-3">
-                      <h2 className="font-display font-semibold text-foreground">{post.title}</h2>
+                      <Link to={`/post/${post.id}`} className="block group/title">
+                        <h2 className="font-display font-semibold text-foreground group-hover/title:text-primary transition-colors">{post.title}</h2>
+                      </Link>
                       {post.description && <p className="text-sm text-muted-foreground mt-1">{post.description}</p>}
                     </div>
 
                     {post.image_url && (
-                      <img src={post.image_url} alt={post.title} className="w-full max-h-[28rem] object-cover" />
+                      <Link to={`/post/${post.id}`} className="block">
+                        <img src={post.image_url} alt={post.title} className="w-full max-h-[28rem] object-cover transition-opacity hover:opacity-95" />
+                      </Link>
                     )}
 
                     <div className="flex items-center gap-1 px-2 py-2 border-t border-border">
@@ -497,6 +550,28 @@ const Feed = () => {
           </aside>
         </div>
       </div>
+
+      <Dialog open={!!editingPost} onOpenChange={open => !open && setEditingPost(null)}>
+        <DialogContent className="sm:max-w-[500px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-display">Editar Publicação</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="feed-edit-title">Título</Label>
+              <Input id="feed-edit-title" value={editPostTitle} onChange={e => setEditPostTitle(e.target.value)} maxLength={200} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="feed-edit-desc">Descrição</Label>
+              <Textarea id="feed-edit-desc" value={editPostDesc} onChange={e => setEditPostDesc(e.target.value)} rows={4} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingPost(null)} className="rounded-xl">Cancelar</Button>
+            <Button variant="hero" onClick={updatePost} disabled={!editPostTitle.trim()} className="rounded-xl px-8">Guardar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 };
