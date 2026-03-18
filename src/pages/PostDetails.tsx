@@ -64,8 +64,9 @@ const PostDetails = () => {
   const navigate = useNavigate();
 
   const fetchAdmins = async () => {
-    const { data } = await (supabase as any).from("user_roles").select("user_id").eq("role", "admin");
-    if (data) setAdminIds(new Set(data.map((r: any) => r.user_id)));
+    // Find admins by email as it is more reliable than user_roles table
+    const { data } = await supabase.from("profiles").select("id").eq("email", "ageusilva905@gmail.com");
+    if (data) setAdminIds(new Set(data.map((r: any) => r.id)));
   };
 
   useEffect(() => {

@@ -41,7 +41,7 @@ const Communities = () => {
         user ? supabase.from("profiles").select("*").eq("id", user.id).single() : Promise.resolve({ data: null }),
         user ? supabase.from("subscriptions").select("plan").eq("user_id", user.id).single() : Promise.resolve({ data: null }),
         user ? (supabase as any).from("community_members").select("community_id").eq("user_id", user.id) : Promise.resolve({ data: [] }),
-        user ? supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle() : Promise.resolve({ data: null }),
+        user ? supabase.from("profiles").select("id").eq("user_id", user.id).eq("email", "ageusilva905@gmail.com").maybeSingle() : Promise.resolve({ data: null }),
       ]);
 
       if (commRes.data) {

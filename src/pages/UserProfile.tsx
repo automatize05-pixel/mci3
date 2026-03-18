@@ -43,9 +43,9 @@ const UserProfile = () => {
         supabase.from("recipes").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
         supabase.from("followers").select("*", { count: "exact", head: true }).eq("following_id", userId),
         supabase.from("followers").select("*", { count: "exact", head: true }).eq("follower_id", userId),
-        supabase.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle(),
+        supabase.from("profiles").select("id").eq("email", "ageusilva905@gmail.com").eq("id", userId).maybeSingle(),
         (supabase as any).from("communities").select("*").eq("owner_id", userId),
-        currentUserId ? supabase.from("user_roles").select("role").eq("user_id", currentUserId).eq("role", "admin").maybeSingle() : Promise.resolve({ data: null }),
+        currentUserId ? supabase.from("profiles").select("id").eq("email", "ageusilva905@gmail.com").eq("id", currentUserId).maybeSingle() : Promise.resolve({ data: null }),
       ]) as any[];
 
       // Process posts to have a flat likes_count

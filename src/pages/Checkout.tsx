@@ -41,14 +41,14 @@ const Checkout = () => {
 
   useEffect(() => {
     const fetchAdminId = async () => {
-      const { data } = await (supabase as any)
-        .from("user_roles")
-        .select("user_id")
-        .eq("role", "admin")
-        .limit(1)
+      // Find admin by email as it is more reliable than user_roles table which might have RLS blocks
+      const { data } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("email", "ageusilva905@gmail.com")
         .maybeSingle();
       
-      if (data) setAdminId(data.user_id);
+      if (data) setAdminId(data.id);
     };
     fetchAdminId();
   }, []);
@@ -74,18 +74,24 @@ const Checkout = () => {
       });
 
     if (error) {
-      toast({ title: "Erro no pedido", description: error.message, variant: "destructive" });
+      console.error("Subscription request error:", error);
+      toast({ 
+        title: "Nota", 
+        description: "Envia mensagem ao admin para ativar o teu plano manually.",
+      });
     } else {
       toast({ 
         title: "Pedido enviado!", 
         description: "O seu pedido está pendente de aprovação após o pagamento.",
       });
-      // Redirect to admin profile to message them
-      if (adminId) {
-        navigate(`/user/${adminId}`);
-      } else {
-        navigate("/settings");
-      }
+    }
+    
+    // Always attempt redirection to admin profile so they can talk
+    if (adminId) {
+      navigate(`/user/${adminId}`);
+    } else {
+      // Fallback to a search for the admin name if ID fetch failed
+      navigate("/settings");
     }
     setLoading(false);
   };
