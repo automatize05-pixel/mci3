@@ -104,52 +104,50 @@ const UserProfile = () => {
           <div className="h-28 gradient-warm relative" />
 
           <div className="px-6 pb-6">
-            {/* Avatar overlapping cover */}
-            <div className="flex flex-col sm:flex-row sm:items-end gap-5 -mt-14 mb-6">
+            <div className="flex flex-col sm:flex-row items-center sm:items-end gap-5 -mt-16 sm:-mt-14 mb-6 text-center sm:text-left">
               <div className="relative shrink-0">
-                <div className="ring-4 ring-card rounded-full overflow-hidden bg-card">
+                <div className="ring-4 ring-card rounded-full overflow-hidden bg-card shadow-lg">
                   <UserAvatar src={profile.profile_picture} name={profile.name} username={profile.username} isChef={isChef} isVerified={isAdmin} size="xl" linked={false} />
                 </div>
               </div>
               
-              <div className="flex-1 min-w-0 pt-2 sm:pt-0">
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <h1 className="text-2xl font-bold font-display text-foreground leading-tight truncate">{displayName}</h1>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold font-display text-foreground leading-tight">{displayName}</h1>
                   {isAdmin && (
-                    <div className="shrink-0 text-[#1d9bf0]">
-                      <svg viewBox="0 0 24 24" className="w-6 h-6 fill-current">
+                    <div className="shrink-0 text-[#1d9bf0] flex items-center pb-0.5">
+                      <svg viewBox="0 0 24 24" className="w-6 h-6 sm:w-7 sm:h-7 fill-current">
                         <path d="M22.25 12c0-1.43-.88-2.67-2.19-3.34.46-1.39.2-2.9-.81-3.91s-2.52-1.27-3.91-.81c-.67-1.31-1.91-2.19-3.34-2.19s-2.67.88-3.33 2.19c-1.4-.46-2.91-.2-3.92.81s-1.26 2.52-.8 3.91c-1.31.67-2.2 1.91-2.2 3.34s.89 2.67 2.2 3.34c-.46 1.39-.21 2.9.8 3.91s2.52 1.26 3.91.81c.67 1.31 1.91 2.19 3.34 2.19s2.67-.88 3.34-2.19c1.39.45 2.9.2 3.91-.81s1.27-2.52.81-3.91c1.31-.67 2.19-1.91 2.19-3.34zm-11.71 4.2l-3.53-3.53 1.41-1.41 2.12 2.12 4.96-4.96L16.91 9.84l-6.37 6.36z" />
                       </svg>
                     </div>
                   )}
                   {isChef && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-chef/10 text-chef text-[10px] font-bold uppercase tracking-wider border border-chef/20">
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-chef text-white text-[10px] font-bold uppercase tracking-wider shadow-sm">
                       <ChefHat className="h-3 w-3" /> Chef
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground font-medium">{displayUsername}</p>
+                <p className="text-base text-muted-foreground font-medium mb-4 sm:mb-0">{displayUsername}</p>
               </div>
 
-              {/* Actions */}
-              <div className="flex flex-wrap gap-2 shrink-0 sm:pb-1">
+              <div className="flex flex-wrap items-center justify-center gap-2 shrink-0 sm:pb-2 w-full sm:w-auto mt-2 sm:mt-0">
                 {!isOwnProfile ? (
                   <>
-                    <Button onClick={toggleFollow} variant={isFollowing ? "outline" : "hero"} className="rounded-xl px-6" size="sm">
+                    <Button onClick={toggleFollow} variant={isFollowing ? "outline" : "hero"} className="rounded-xl px-8 h-10" size="sm">
                       {isFollowing ? <><UserMinus className="h-4 w-4 mr-2" /> A seguir</> : <><UserPlus className="h-4 w-4 mr-2" /> Seguir</>}
                     </Button>
                     <Link to="/messages">
-                      <Button variant="outline" className="rounded-xl w-10 p-0" size="sm">
+                      <Button variant="outline" className="rounded-xl w-10 h-10 p-0 hover:bg-muted" size="sm">
                         <MessageSquare className="h-4 w-4" />
                       </Button>
                     </Link>
                   </>
                 ) : (
                   <Link to="/settings" className="w-full sm:w-auto">
-                    <Button variant="outline" className="rounded-xl w-full sm:w-auto font-medium" size="sm">Editar Perfil</Button>
+                    <Button variant="outline" className="rounded-xl w-full sm:w-auto font-semibold px-6 h-10 border-2 hover:bg-muted" size="sm">Editar Perfil</Button>
                   </Link>
                 )}
-                <Button variant="outline" className="rounded-xl w-10 p-0" size="sm" onClick={() => {
+                <Button variant="outline" className="rounded-xl w-10 h-10 p-0 border-2 hover:bg-muted shrink-0" size="sm" onClick={() => {
                   navigator.clipboard.writeText(window.location.href);
                   toast({ title: "Link copiado!" });
                 }}>
