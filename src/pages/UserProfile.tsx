@@ -85,7 +85,8 @@ const UserProfile = () => {
   const engagementRate = followersCount > 0 ? ((totalLikes / Math.max(posts.length, 1)) / followersCount * 100).toFixed(1) : "0";
 
   // Display name logic
-  const displayName = profile?.name || profile?.username || "Utilizador";
+  const displayName = profile?.name && profile.name.trim() !== "" ? profile.name : profile?.username || "Utilizador";
+  const displayUsername = profile?.username?.startsWith("@") ? profile.username : `@${profile?.username || ""}`;
 
   if (loading) {
     return <AppLayout><div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></AppLayout>;
@@ -124,7 +125,7 @@ const UserProfile = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground">@{profile.username}</p>
+                <p className="text-sm text-muted-foreground">{displayUsername}</p>
               </div>
               {/* Actions */}
               {!isOwnProfile && (
