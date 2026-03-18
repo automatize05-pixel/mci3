@@ -5,7 +5,7 @@ import UserAvatar from "@/components/Avatar";
 import { StoryList } from "@/components/StoryList";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, PlusCircle, Loader2, Send, MoreHorizontal, Pencil, Trash2, Reply, Share2, Trophy, Sparkles, TrendingUp, Bookmark } from "lucide-react";
+import { Heart, MessageCircle, PlusCircle, Loader2, Send, MoreHorizontal, Pencil, Trash2, Reply, Share2, Trophy, Sparkles, TrendingUp, Bookmark, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
