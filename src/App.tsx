@@ -25,6 +25,7 @@ import PostDetails from "./pages/PostDetails";
 import Communities from "./pages/Communities";
 import CreateCommunity from "./pages/CreateCommunity";
 import CommunityDetails from "./pages/CommunityDetails";
+import Checkout from "./pages/Checkout";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,7 @@ const App = () => (
           <Route path="/create-community" element={<AuthGuard><CreateCommunity /></AuthGuard>} />
           <Route path="/community/:id" element={<AuthGuard><CommunityDetails /></AuthGuard>} />
           <Route path="/keels" element={<AuthGuard><Keels /></AuthGuard>} />
+          <Route path="/checkout" element={<AuthGuard><Checkout /></AuthGuard>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
