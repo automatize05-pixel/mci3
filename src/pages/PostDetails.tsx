@@ -64,7 +64,7 @@ const PostDetails = () => {
   const navigate = useNavigate();
 
   const fetchAdmins = async () => {
-    const { data } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
+    const { data } = await (supabase as any).from("user_roles").select("user_id").eq("role", "admin");
     if (data) setAdminIds(new Set(data.map((r: any) => r.user_id)));
   };
 
@@ -80,7 +80,7 @@ const PostDetails = () => {
     setLoading(true);
     
     // Fetch post with profile and likes count
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("posts")
       .select("*, profiles(name, username, profile_picture, account_type), likes_count:likes(count)")
       .eq("id", postId)
@@ -102,7 +102,7 @@ const PostDetails = () => {
     setEditPostDesc(data.description || "");
 
     // Fetch comments
-    const { data: commentsData } = await supabase
+    const { data: commentsData } = await (supabase as any)
       .from("comments")
       .select("*, profiles(name, username, profile_picture, account_type)")
       .eq("post_id", postId)
@@ -110,7 +110,7 @@ const PostDetails = () => {
 
     if (commentsData) {
       const commentIds = commentsData.map(c => c.id);
-      const { data: reactions } = await supabase.from("comment_reactions").select("comment_id").in("comment_id", commentIds).eq("reaction_type", "like");
+      const { data: reactions } = await (supabase as any).from("comment_reactions").select("comment_id").in("comment_id", commentIds).eq("reaction_type", "like");
       
       const counts: Record<string, number> = {};
       commentIds.forEach(id => counts[id] = 0);
@@ -125,10 +125,10 @@ const PostDetails = () => {
 
     // Check likes
     if (currentUserId) {
-      const { data: postLike } = await supabase.from("likes").select("id").eq("user_id", currentUserId).eq("post_id", postId).maybeSingle();
+      const { data: postLike } = await (supabase as any).from("likes").select("id").eq("user_id", currentUserId).eq("post_id", postId).maybeSingle();
       if (postLike) setLikedPosts(new Set([postId]));
 
-      const { data: commLikes } = await supabase.from("comment_reactions").select("comment_id").eq("user_id", currentUserId).eq("reaction_type", "like");
+      const { data: commLikes } = await (supabase as any).from("comment_reactions").select("comment_id").eq("user_id", currentUserId).eq("reaction_type", "like");
       setLikedComments(new Set(commLikes?.map((l: any) => l.comment_id) || []));
     }
 
@@ -143,11 +143,11 @@ const PostDetails = () => {
     if (!currentUserId || !post) return;
     const isLiked = likedPosts.has(post.id);
     if (isLiked) {
-      await supabase.from("likes").delete().eq("user_id", currentUserId).eq("post_id", post.id);
+      await (supabase as any).from("likes").delete().eq("user_id", currentUserId).eq("post_id", post.id);
       setLikedPosts(new Set());
       setPost(prev => prev ? { ...prev, likes_count: Math.max(0, prev.likes_count - 1) } : null);
     } else {
-      await supabase.from("likes").insert({ user_id: currentUserId, post_id: post.id });
+      await (supabase as any).from("likes").insert({ user_id: currentUserId, post_id: post.id });
       setLikedPosts(new Set([post.id]));
       setPost(prev => prev ? { ...prev, likes_count: prev.likes_count + 1 } : null);
     }
@@ -157,11 +157,11 @@ const PostDetails = () => {
     if (!currentUserId) return;
     const isLiked = likedComments.has(commentId);
     if (isLiked) {
-      await supabase.from("comment_reactions").delete().eq("user_id", currentUserId).eq("comment_id", commentId).eq("reaction_type", "like");
+      await (supabase as any).from("comment_reactions").delete().eq("user_id", currentUserId).eq("comment_id", commentId).eq("reaction_type", "like");
       setLikedComments(prev => { const n = new Set(prev); n.delete(commentId); return n; });
       setComments(prev => prev.map(c => c.id === commentId ? { ...c, reactions_count: Math.max(0, (c.reactions_count || 0) - 1) } : c));
     } else {
-      await supabase.from("comment_reactions").insert({ user_id: currentUserId, comment_id: commentId, reaction_type: "like" });
+      await (supabase as any).from("comment_reactions").insert({ user_id: currentUserId, comment_id: commentId, reaction_type: "like" });
       setLikedComments(prev => new Set(prev).add(commentId));
       setComments(prev => prev.map(c => c.id === commentId ? { ...c, reactions_count: (c.reactions_count || 0) + 1 } : c));
     }
@@ -170,7 +170,7 @@ const PostDetails = () => {
   const submitComment = async () => {
     if (!commentText.trim() || !currentUserId || !postId) return;
     const parentId = replyTo?.id || null;
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("comments")
       .insert({ post_id: postId, user_id: currentUserId, content: commentText.trim(), parent_id: parentId })
       .select("*, profiles(name, username, profile_picture, account_type)")
@@ -185,7 +185,7 @@ const PostDetails = () => {
   };
 
   const deleteComment = async (commentId: string) => {
-    const { error } = await supabase.from("comments").delete().eq("id", commentId);
+    const { error } = await (supabase as any).from("comments").delete().eq("id", commentId);
     if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
     setComments(prev => prev.filter(c => c.id !== commentId && c.parent_id !== commentId));
     toast({ title: "Comentário removido." });
@@ -193,7 +193,7 @@ const PostDetails = () => {
 
   const updateComment = async (commentId: string) => {
     if (!editCommentText.trim()) return;
-    const { error } = await supabase.from("comments").update({ content: editCommentText.trim() }).eq("id", commentId);
+    const { error } = await (supabase as any).from("comments").update({ content: editCommentText.trim() }).eq("id", commentId);
     if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
     setComments(prev => prev.map(c => c.id === commentId ? { ...c, content: editCommentText.trim() } : c));
     setEditingComment(null);
@@ -206,7 +206,7 @@ const PostDetails = () => {
     const confirm = window.confirm("Tem certeza que deseja eliminar esta publicação?");
     if (!confirm) return;
 
-    const { error } = await supabase.from("posts").delete().eq("id", post.id);
+    const { error } = await (supabase as any).from("posts").delete().eq("id", post.id);
     if (error) {
       toast({ title: "Erro ao eliminar", description: error.message, variant: "destructive" });
       return;
@@ -218,7 +218,7 @@ const PostDetails = () => {
 
   const updatePost = async () => {
     if (!post || !editPostTitle.trim()) return;
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("posts")
       .update({ title: editPostTitle.trim(), description: editPostDesc.trim() || null })
       .eq("id", post.id);
