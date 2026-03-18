@@ -86,21 +86,33 @@ const Admin = () => {
     setDbStatus(status);
   };
 
-  useEffect(() => {
-    fetchData();
-    checkDatabase();
-  }, []);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const updateUserStatus = async (userId: string, status: "approved" | "suspended" | "pending") => {
-    setActionLoading(userId);
-    const { error } = await supabase.from("profiles").update({ account_status: status }).eq("id", userId);
-    if (error) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Sucesso", description: `Utilizador ${status === "approved" ? "aprovado" : status === "suspended" ? "suspenso" : "pendente"}.` });
-      fetchData();
+  const fetchData = async () => {
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const [profilesRes, postsRes, recipesRes, requestsRes] = await Promise.all([
+        supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+        supabase.from("posts").select("*, profiles(name, username, profile_picture)").order("created_at", { ascending: false }),
+        supabase.from("recipes").select("*, profiles(name, username, profile_picture)").order("created_at", { ascending: false }),
+        (supabase as any).from("subscription_requests").select("*, profiles(name, username, email)").order("created_at", { ascending: false }),
+      ]);
+
+      if (profilesRes.data) setProfiles(profilesRes.data);
+      if (postsRes.data) setPosts(postsRes.data as any);
+      if (recipesRes.data) setRecipes(recipesRes.data as any);
+      
+      if (requestsRes.error) {
+        console.error("Subscription requests error:", requestsRes.error);
+        setFetchError(requestsRes.error.message);
+      }
+      if (requestsRes.data) setSubscriptionRequests(requestsRes.data);
+    } catch (err: any) {
+      console.error("fetchData error:", err);
+      setFetchError(err.message);
     }
-    setActionLoading(null);
+    setLoading(false);
   };
 
   const deletePost = async (postId: string) => {
@@ -375,6 +387,16 @@ const Admin = () => {
           </TabsContent>
 
           <TabsContent value="subscriptions">
+            {fetchError && (
+              <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl mb-6">
+                <p className="text-red-500 text-sm font-bold flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4" /> ATENÇÃO: Erro na Tabela de Subscrições
+                </p>
+                <p className="text-muted-foreground text-xs mt-1">
+                  Não foi possível carregar os pedidos: "{fetchError}". Verifique se a tabela "subscription_requests" foi criada.
+                </p>
+              </div>
+            )}
             <div className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
               <Table>
                 <TableHeader>

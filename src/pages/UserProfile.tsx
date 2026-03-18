@@ -48,6 +48,10 @@ const UserProfile = () => {
         currentUserId ? supabase.from("profiles").select("id").eq("email", "ageusilva905@gmail.com").eq("id", currentUserId).maybeSingle() : Promise.resolve({ data: null }),
       ]) as any[];
 
+      // Final fallback for isAdmin check if email query blocked by RLS
+      const isTargetAdmin = !!roleRes.data || profileRes.data?.username === "ageusilva905";
+      const isCurAdmin = !!viewerRoleRes.data || (currentUserId && profileRes.data?.id === currentUserId && profileRes.data?.username === "ageusilva905");
+
       // Process posts to have a flat likes_count
       const processedPosts = (postsRes.data || []).map((post: any) => ({
         ...post,
@@ -59,9 +63,9 @@ const UserProfile = () => {
       setRecipes(recipesRes.data || []);
       setFollowersCount(followersRes.count || 0);
       setFollowingCount(followingRes.count || 0);
-      setIsAdmin(!!roleRes.data);
+      setIsAdmin(isTargetAdmin);
       setUserCommunities(commRes.data || []);
-      setIsViewerAdmin(!!viewerRoleRes.data);
+      setIsViewerAdmin(isCurAdmin);
 
       // Total likes on user's posts
       if (postsRes.data && postsRes.data.length > 0) {

@@ -65,9 +65,17 @@ const Feed = () => {
   const { toast } = useToast();
   
   const fetchAdmins = async () => {
-    // Find admins by email as it is more reliable than user_roles table
-    const { data } = await supabase.from("profiles").select("id").eq("email", "ageusilva905@gmail.com");
-    if (data) setAdminIds(new Set(data.map((r: any) => r.id)));
+    // Strategy 1: Email (Works for admin)
+    const { data: byEmail } = await supabase.from("profiles").select("id").eq("email", "ageusilva905@gmail.com");
+    let ids = byEmail ? byEmail.map((r: any) => r.id) : [];
+    
+    // Strategy 2: Username fallback (Works for everyone if public)
+    if (ids.length === 0) {
+      const { data: byUsername } = await supabase.from("profiles").select("id").eq("username", "ageusilva905");
+      if (byUsername) ids = byUsername.map((p: any) => p.id);
+    }
+
+    if (ids.length > 0) setAdminIds(new Set(ids));
   };
 
   useEffect(() => {

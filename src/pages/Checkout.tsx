@@ -41,14 +41,32 @@ const Checkout = () => {
 
   useEffect(() => {
     const fetchAdminId = async () => {
-      // Find admin by email as it is more reliable than user_roles table which might have RLS blocks
-      const { data } = await supabase
+      // 1. Try email (works if current user is admin or if email is public)
+      const { data: byEmail } = await supabase
         .from("profiles")
         .select("id")
         .eq("email", "ageusilva905@gmail.com")
         .maybeSingle();
       
-      if (data) setAdminId(data.id);
+      if (byEmail) {
+        setAdminId(byEmail.id);
+        console.log("Admin ID found by email:", byEmail.id);
+        return;
+      }
+
+      // 2. Try username as fallback (more likely to be public)
+      const { data: byUsername } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("username", "ageusilva905")
+        .maybeSingle();
+
+      if (byUsername) {
+        setAdminId(byUsername.id);
+        console.log("Admin ID found by username:", byUsername.id);
+      } else {
+        console.warn("Could not find admin ID. Redirection will fallback to settings.");
+      }
     };
     fetchAdminId();
   }, []);
