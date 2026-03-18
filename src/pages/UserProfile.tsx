@@ -9,6 +9,7 @@ import { ChefHat, Users, BookOpen, Heart, Loader2, MessageSquare, UserPlus, User
 import { useToast } from "@/hooks/use-toast";
 
 const UserProfile = () => {
+  const { userId } = useParams<{ userId: string }>();
   const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
   const [profile, setProfile] = useState<any>(null);
